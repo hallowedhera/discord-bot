@@ -1,3 +1,4 @@
+
 const http = require("http");
 
 http.createServer((req, res) => {
@@ -8,6 +9,8 @@ http.createServer((req, res) => {
 });
 
 console.log("SCRIPT STARTED");
+process.on("uncaughtException", console.error);
+process.on("unhandledRejection", console.error);
 
 
 
