@@ -1,6 +1,27 @@
 const http = require("http");
 
 http.createServer((req, res) => {
+  res.write("OK");
+  res.end();
+}).listen(process.env.PORT, () => {
+  console.log("HTTP server running on port", process.env.PORT);
+});
+
+console.log("SCRIPT STARTED");
+
+const http = require("http");
+
+const server = http.createServer((req, res) => {
+  res.write("OK");
+  res.end();
+});
+
+server.listen(process.env.PORT, () => {
+  console.log("PORT OPEN:", process.env.PORT);
+});
+const http = require("http");
+
+http.createServer((req, res) => {
   res.write("Bot is alive");
   res.end();
 }).listen(process.env.PORT);
