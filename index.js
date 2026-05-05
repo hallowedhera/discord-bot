@@ -167,7 +167,7 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // =======================
 // LOGIN
 // =======================
-client.login('MTUwMTMyMjY2ODg0NTMwMTc2MA.GtILZI.cpIVIQEKc5h7c617SK3tQ8n5Pchk5uLozpkG7k');
+client.login(process.env.DISCORD_TOKEN);
 
 client.on('messageCreate', message => {
   console.log("message seen:", message.content);
