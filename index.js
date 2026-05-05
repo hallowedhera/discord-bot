@@ -9,7 +9,7 @@ http.createServer((req, res) => {
 
 console.log("SCRIPT STARTED");
 
-const http = require("http");
+
 
 const server = http.createServer((req, res) => {
   res.write("OK");
