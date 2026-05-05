@@ -168,6 +168,9 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // LOGIN
 // =======================
 console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
+console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
+console.log("TOKEN LENGTH:", process.env.DISCORD_TOKEN?.length);
+console.log("TOKEN START:", process.env.DISCORD_TOKEN?.slice(0, 10));
 
 client.login(process.env.DISCORD_TOKEN);
 
