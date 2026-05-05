@@ -19,7 +19,6 @@ const server = http.createServer((req, res) => {
 server.listen(process.env.PORT, () => {
   console.log("PORT OPEN:", process.env.PORT);
 });
-const http = require("http");
 
 http.createServer((req, res) => {
   res.write("Bot is alive");
