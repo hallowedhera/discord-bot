@@ -167,6 +167,8 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // =======================
 // LOGIN
 // =======================
+console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
+
 client.login(process.env.DISCORD_TOKEN);
 
 client.on('messageCreate', message => {
