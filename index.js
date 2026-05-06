@@ -114,13 +114,6 @@ const client = new Client({
 });
 
 // =======================
-// KEEP-ALIVE SERVER
-// =======================
-const app = express();
-app.get("/", (req, res) => res.send("Bot is active."));
-app.listen(PORT, () => console.log(`Keep-alive server on port ${PORT}`));
-
-// =======================
 // XP LOGIC
 // =======================
 async function addXP(userId, guild) {
