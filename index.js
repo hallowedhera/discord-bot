@@ -223,6 +223,7 @@ async function addXP(userId, guild) {
 // EVENT HANDLERS
 // =======================
 client.once("ready", () => {
+      console.log(`✅ Logged in as ${client.user.tag}`);
   const cron = require('node-cron');
     
     const GENERAL_CHANNEL_ID = "1285656272774889605";
@@ -259,7 +260,6 @@ client.once("ready", () => {
 
     console.log("⏰ Schedules initialized!");
 });
-    console.log(`✅ Logged in as ${client.user.tag}`);
     client.user.setPresence({
         status: "online",
         activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
