@@ -1,7 +1,9 @@
 const http = require("http");
+const axios = require("axios");
+const Parser = require("rss-parser");
 
 // =======================
-// SIMPLE KEEP-ALIVE SERVER (ONLY ONE)
+// SIMPLE KEEP-ALIVE SERVER
 // =======================
 const PORT = process.env.PORT || 10000;
 
@@ -37,26 +39,137 @@ const client = new Client({
 });
 
 // =======================
+// ALERT CONFIG
+// =======================
+const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
+
+// Twitch
+const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
+const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
+const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
+
+// YouTube
+const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
+
+// TikTok
+const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
+
+const parser = new Parser();
+
+let twitchToken = null;
+let isLive = false;
+let lastVideo = null;
+let lastTikTok = null;
+
+// =======================
+// TWITCH TOKEN
+// =======================
+async function getTwitchToken() {
+  const res = await axios.post(`https://id.twitch.tv/oauth2/token`, null, {
+    params: {
+      client_id: TWITCH_CLIENT_ID,
+      client_secret: TWITCH_CLIENT_SECRET,
+      grant_type: "client_credentials"
+    }
+  });
+
+  twitchToken = res.data.access_token;
+}
+
+// =======================
+// TWITCH CHECK
+// =======================
+async function checkTwitch() {
+  if (!twitchToken) await getTwitchToken();
+
+  const res = await axios.get(`https://api.twitch.tv/helix/streams`, {
+    headers: {
+      "Client-ID": TWITCH_CLIENT_ID,
+      "Authorization": `Bearer ${twitchToken}`
+    },
+    params: {
+      user_login: TWITCH_USERNAME
+    }
+  });
+
+  const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+  if (!channel) return;
+
+  if (res.data.data.length > 0) {
+    if (!isLive) {
+      isLive = true;
+
+      channel.send({
+        embeds: [{
+          title: "🔴 Hera is LIVE!",
+          description: "Come hang out 💜",
+          url: `https://twitch.tv/${TWITCH_USERNAME}`,
+          color: 0x9146FF
+        }]
+      });
+    }
+  } else {
+    isLive = false;
+  }
+}
+
+// =======================
+// YOUTUBE CHECK
+// =======================
+async function checkYouTube() {
+  const feed = await parser.parseURL(
+    `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`
+  );
+
+  const latest = feed.items[0];
+  const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+
+  if (!channel) return;
+
+  if (lastVideo !== latest.id) {
+    lastVideo = latest.id;
+
+    channel.send(`🎥 **New YouTube Video!**\n${latest.link}`);
+  }
+}
+
+// =======================
+// TIKTOK CHECK (RSS)
+// =======================
+async function checkTikTok() {
+  const feed = await parser.parseURL(
+    `https://rsshub.app/tiktok/user/${TIKTOK_USERNAME}`
+  );
+
+  const latest = feed.items[0];
+  const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+
+  if (!channel) return;
+
+  if (lastTikTok !== latest.link) {
+    lastTikTok = latest.link;
+
+    channel.send(`🎵 **New TikTok!**\n${latest.link}`);
+  }
+}
+
+// =======================
 // ROLE MAP
 // =======================
 const reactionRoles = {
   "💻": "PC",
   "🎮": "Console",
-
   "🔪": "DBD",
   "💥": "Shooters",
   "🍄": "Minecraft",
   "🔴": "Pokemon",
   "🕯️": "Spooky Time",
-
   "♀️": "She/Her",
   "♂️": "He/Him",
   "🫧": "They/Them",
   "💌": "DM'S Open",
-
   "🔞": "18+",
   "🧸": "Under 18",
-
   "🎬": "Movie Night",
   "🤝": "Partner Servers",
   "🎉": "Server Events"
@@ -102,14 +215,23 @@ const panels = [
   }
 ];
 
-// store role message IDs
 let roleMessageIDs = [];
 
 // =======================
 // READY
 // =======================
-client.once('clientReady', () => {
+client.once('ready', () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  client.user.setPresence({
+    status: 'online',
+    activities: [{ name: 'your server 💜' }]
+  });
+
+  // Start loops AFTER bot is ready
+  setInterval(checkTwitch, 60000);
+  setInterval(checkYouTube, 120000);
+  setInterval(checkTikTok, 180000);
 });
 
 // =======================
@@ -118,7 +240,7 @@ client.once('clientReady', () => {
 client.on('messageCreate', async (message) => {
   if (message.content !== '!roles') return;
 
-  roleMessageIDs = []; // reset
+  roleMessageIDs = [];
 
   await message.channel.send(
     "**Hera's Hollow Role Menu**\n" +
@@ -149,8 +271,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
   if (reaction.message.partial) await reaction.message.fetch();
 
   if (!reaction.message.guild) return;
-
-  // only allow role panel messages
   if (!roleMessageIDs.includes(reaction.message.id)) return;
 
   const roleName = reactionRoles[reaction.emoji.name];
@@ -162,7 +282,6 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
   if (!role) return;
 
-  // AGE LOCK
   if (roleName === "18+") {
     const under18 = guild.roles.cache.find(r => r.name === "Under 18");
     if (under18) await member.roles.remove(under18);
@@ -204,18 +323,4 @@ client.on('messageReactionRemove', async (reaction, user) => {
 // LOGIN
 // =======================
 console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
-
 client.login(process.env.DISCORD_TOKEN);
-
-// debug
-client.on('messageCreate', message => {
-  console.log("message seen:", message.content);
-});
-
-client.once('ready', () => {
-  console.log(`Logged in as ${client.user.tag}`);
-  client.user.setPresence({
-    status: 'online',
-    activities: [{ name: 'your server 💜' }]
-  });
-});
