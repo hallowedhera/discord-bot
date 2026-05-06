@@ -12,45 +12,46 @@ const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 
-// =======================
-// 1. ALL REQUIRES (Must be first)
-// =======================
+// 1. IMPORT ALL TOOLS (This MUST be the very first thing)
 const express = require("express");
 const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const axios = require("axios");
 const cron = require('node-cron');
-// =======================
+const { 
+    Client, 
+    GatewayIntentBits, 
+    Partials, 
+    EmbedBuilder, 
+    ActivityType 
+} = require("discord.js"); // <--- This is what defines "Client"
+
 // 2. CONFIG & PORT
-// =======================
+const TOKEN = process.env.DISCORD_TOKEN;
 const PORT = process.env.PORT || 10000;
 
-// =======================
-// 3. KEEP-ALIVE SERVER
-// =======================
+// 3. START KEEP-ALIVE SERVER
 const app = express();
 app.get("/", (req, res) => res.send("Bot is active."));
 app.listen(PORT, () => console.log(`🌿 Forest Monitoring active on port ${PORT}`));
 
-// =======================
-// 4. DATABASE INIT
-// =======================
+// 4. INITIALIZE DATABASE
 const dbPath = path.resolve(__dirname, "bot.db");
 const db = new sqlite3.Database(dbPath);
 
-// =======================
-// 5. CLIENT INITIALIZATION
-// =======================
+// 5. CREATE THE BOT CLIENT (Only do this ONCE)
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMembers // 👈 Mandatory for Joins/Leaves!
+        GatewayIntentBits.GuildMembers 
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
+
+// 6. EVENT HANDLERS (Your welcome/leave code goes below here...)
  db.serialize(() => {
     // Added 'balance' column here
     db.run(`CREATE TABLE IF NOT EXISTS users (
