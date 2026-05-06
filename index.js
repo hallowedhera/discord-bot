@@ -263,10 +263,68 @@ client.on("messageCreate", async (message) => {
   const content = message.content.toLowerCase();
   const mood = bot.mood;
 
+  // =========================
+  // PREFIX COMMANDS FIRST
+  // =========================
+  if (content.startsWith("!")) {
+
+    if (content === "!help") {
+      return message.channel.send(
+        "💜 **Commands**:\n" +
+        "!help\n!roles\n!daily\n!leaderboard\n!rank"
+      );
+    }
+
+    if (content === "!roles") {
+      let text = "🎭 **React Roles Panel**\n\n";
+
+      panels.forEach(panel => {
+        text += `**${panel.title}**\n${panel.description}\n\n`;
+      });
+
+      return message.channel.send(text);
+    }
+
+    if (content === "!hello") {
+      return message.reply(pick(personality[mood].hello));
+    }
+
+    if (content === "!rank") {
+      db.get(
+        "SELECT * FROM users WHERE user_id=?",
+        [message.author.id],
+        (err, row) => {
+          if (err) return console.error(err);
+
+          const xp = row?.xp || 0;
+          const level = row?.level || 0;
+
+          message.reply(`📊 Level: **${level}** | XP: **${xp}**`);
+        }
+      );
+
+      return;
+    }
+
+    if (content === "!daily") {
+      return claimDaily(message.author.id, (ok) =>
+        message.reply(ok ? "💜 +50 XP claimed!" : "⏳ Already claimed today!")
+      );
+    }
+
+    return; // stop here so it doesn't fall into AI chatter
+  }
+
+  // =========================
+  // BOT MENTION
+  // =========================
   if (message.mentions.has(client.user)) {
     return message.reply(pick(personality[mood].mention));
   }
 
+  // =========================
+  // NATURAL CHAT ONLY BELOW
+  // =========================
   if (content.includes("hello")) {
     return message.reply(pick(personality[mood].hello));
   }
@@ -279,7 +337,6 @@ client.on("messageCreate", async (message) => {
     return message.reply(pick(personality[mood].default));
   }
 });
-
 // =======================
 // KEEP EVERYTHING ELSE UNCHANGED
 // =======================
