@@ -219,9 +219,6 @@ async function addXP(userId, guild) {
 // =======================
 client.once("ready", () => {
   const cron = require('node-cron');
-
-client.once("ready", () => {
-    // ... your existing ready code ...
     
     const GENERAL_CHANNEL_ID = "1285656272774889605";
 
@@ -275,7 +272,6 @@ client.once("ready", () => {
             lastHeartbeat = now;
         }
     }, 1000 * 60 * 30);
-});
 
 client.on("messageCreate", async (message) => {
     const args = message.content.split(" ");
