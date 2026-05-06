@@ -1,3 +1,11 @@
+// =======================
+// CONFIG & ENV
+// =======================
+const TOKEN = process.env.DISCORD_TOKEN;
+const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
+const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID || ALERT_CHANNEL_ID;
+const PORT = process.env.PORT || 10000;
+
 const { 
     Client, 
     GatewayIntentBits, 
@@ -14,15 +22,6 @@ const express = require("express");
 const app = express();
 app.get("/", (req, res) => res.send("Bot is active."));
 app.listen(PORT, () => console.log(`Keep-alive server on port ${PORT}`));
-
-
-// =======================
-// CONFIG & ENV
-// =======================
-const TOKEN = process.env.DISCORD_TOKEN;
-const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
-const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID || ALERT_CHANNEL_ID;
-const PORT = process.env.PORT || 10000;
 
 // =======================
 // DATABASE INIT
