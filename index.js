@@ -266,13 +266,14 @@ client.on("guildMemberAdd", async (member) => {
             return;
         }
 
-        const welcomeEmbed = new EmbedBuilder()
-            .setColor(0xff66cc)
-            .setTitle("✨ A new bestie has arrived! ✨")
-            .setDescription(`Hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**!`)
-            .setThumbnail(member.user.displayAvatarURL());
+      const welcomeEmbed = new EmbedBuilder()
+    .setColor(0x7fb069) // A soft mossy green
+    .setTitle("🍄 A new friend has wandered in... 🌿")
+    .setDescription(`Hi <@${member.id}>! 🍓\nWelcome to **${member.guild.name}**!`)
+    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+    .setFooter({ text: `Friend #${member.guild.memberCount} 🧺` });
 
-        await channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
+await channel.send({ content: `Welcome 🌿 <@${member.id}>!`, embeds: [welcomeEmbed] });
         console.log("✅ Welcome message sent successfully!");
 
     } catch (e) {
@@ -303,7 +304,7 @@ client.on("guildMemberRemove", async (member) => {
 
         const leaveEmbed = new EmbedBuilder()
             .setColor(0xff0000) 
-            .setTitle("💔 Member Left")
+            .setTitle("Member Left")
             .setThumbnail(member.user.displayAvatarURL())
             .setDescription(`**${member.user.tag}** has left the server.`)
             .addFields(
