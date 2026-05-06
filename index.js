@@ -248,32 +248,30 @@ async function addXP(userId, guild) {
 // WELCOME & AUTO-ROLE
 // =======================
 client.on("guildMemberAdd", async (member) => {
+    console.log(`New member joined: ${member.user.tag}`); // Debug log
     try {
-        // 1. Give the "Minions" Role Automatically
-        const autoRoleName = "Minions"; 
-        const role = member.guild.roles.cache.find(r => r.name === autoRoleName);
-        
-        if (role) {
-            await member.roles.add(role).catch(e => console.log("Auto-role error:", e.message));
-        }
+        // 1. Give Role
+        const role = member.guild.roles.cache.find(r => r.name === "Minions");
+        if (role) await member.roles.add(role);
 
-        // 2. Send the Welcome Message
+        // 2. Welcome Message Logic
+        console.log(`Attempting to send welcome to: ${WELCOME_CHANNEL_ID}`); // Debug log
+        
         const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
-        if (!channel) return;
+        
+        if (!channel) {
+            console.log("❌ Error: Could not find welcome channel in cache!");
+            return;
+        }
 
         const welcomeEmbed = new EmbedBuilder()
             .setColor(0xff66cc)
             .setTitle("✨ A new bestie has arrived! ✨")
-            .setDescription(`hi hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**! We are so happy you're here. ✨`)
-            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-            .addFields(
-                { name: "📜 Rules", value: "Check out the rules channel to get started!", inline: true },
-                { name: "🎭 Roles", value: "Grab your roles in the get roles channel!", inline: true }
-            )
-            .setFooter({ text: `Member #${member.guild.memberCount} 🎀` })
-            .setTimestamp();
+            .setDescription(`hi hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**!`)
+            .setThumbnail(member.user.displayAvatarURL());
 
-        channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
+        await channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
+        console.log("✅ Welcome message sent successfully!");
 
     } catch (e) {
         console.error("Welcome System Error:", e.message);
