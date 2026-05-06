@@ -11,11 +11,12 @@ const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
+const MONGO_URI = process.env.MONGO_URI;
 
 // 1. IMPORT ALL TOOLS (This MUST be the very first thing)
 const express = require("express");
 const path = require("path");
-const sqlite3 = require("sqlite3").verbose();
+const mongoose = require("mongoose");
 const axios = require("axios");
 const cron = require('node-cron');
 const { 
@@ -35,8 +36,28 @@ app.get("/", (req, res) => res.send("Bot is active."));
 app.listen(PORT, () => console.log(`🌿 Forest Monitoring active on port ${PORT}`));
 
 // 4. INITIALIZE DATABASE
-const dbPath = path.resolve(__dirname, "bot.db");
-const db = new sqlite3.Database(dbPath);
+// =======================
+// DATABASE INIT (MONGODB)
+// =======================
+mongoose.connect(process.env.MONGO_URI)
+    .then(() => console.log("✨ Connected to the Fairy Cloud (MongoDB)!"))
+    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+
+const userSchema = new mongoose.Schema({
+    userId: String,
+    guildId: String,
+    xp: { type: Number, default: 0 },
+    level: { type: Number, default: 1 },
+    balance: { type: Number, default: 0 }, // Added for economy
+    lastDaily: { type: Number, default: 0 } // Added for daily command
+});
+const roleMessageSchema = new mongoose.Schema({
+    messageId: String,
+    guildId: String
+});
+const RoleMessage = mongoose.model("RoleMessage", roleMessageSchema);
+
+const User = mongoose.model("User", userSchema);
 
 // 5. CREATE THE BOT CLIENT (Only do this ONCE)
 const client = new Client({
@@ -48,19 +69,6 @@ const client = new Client({
         GatewayIntentBits.GuildMembers 
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
-});
-
-// 6. EVENT HANDLERS (Your welcome/leave code goes below here...)
- db.serialize(() => {
-    // Added 'balance' column here
-    db.run(`CREATE TABLE IF NOT EXISTS users (
-        user_id TEXT PRIMARY KEY, 
-        xp INTEGER DEFAULT 0, 
-        level INTEGER DEFAULT 0, 
-        last_daily INTEGER DEFAULT 0,
-        balance INTEGER DEFAULT 0
-    )`);
-    db.run(`CREATE TABLE IF NOT EXISTS role_messages (message_id TEXT PRIMARY KEY, guild_id TEXT)`);
 });
 // =======================
 // ALERTS
@@ -206,40 +214,26 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 // =======================
 // XP LOGIC
 // =======================
+// Replace your addXP function with this:
 async function addXP(userId, guild) {
     const gain = Math.floor(Math.random() * 6) + 5;
-    db.get("SELECT * FROM users WHERE user_id = ?", [userId], async (err, row) => {
-        if (err) return;
-        if (!row) {
-            db.run("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", [userId, gain, 0]);
-        } else {
-            const newXP = row.xp + gain;
-            const newLevel = getLevel(newXP);
-            db.run("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", [newXP, newLevel, userId]);
-            
-            if (newLevel > row.level) {
-                const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
-                if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
-
-                // ✨ Chatterling Role Reward at Level 10
-                if (newLevel >= 10) {
-                    try {
-                        const member = await guild.members.fetch(userId);
-                        const chatterlingRole = guild.roles.cache.find(r => r.name === "Chatterling");
-
-                        if (member && chatterlingRole) {
-                            if (!member.roles.cache.has(chatterlingRole.id)) {
-                                await member.roles.add(chatterlingRole);
-                                if (channel) channel.send(`✨ <@${userId}> has been promoted to **Chatterling**! 🎀`);
-                            }
-                        }
-                    } catch (e) {
-                        console.error("Failed to assign Chatterling role:", e.message);
-                    }
-                }
-            }
+    
+    // Find or Create user in MongoDB
+    let user = await User.findOne({ userId: userId });
+    if (!user) {
+        user = new User({ userId: userId, xp: gain, level: 0 });
+    } else {
+        user.xp += gain;
+        const newLevel = getLevel(user.xp);
+        
+        if (newLevel > user.level) {
+            user.level = newLevel;
+            const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
+            if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
+            // ... (keep your Chatterling logic here)
         }
-    });
+    }
+    await user.save();
 }
 
 // =======================
@@ -376,18 +370,27 @@ client.once("ready", () => {
 
     console.log("⏰ Schedules initialized!");
 });
-    
-    
-client.on("messageCreate", async (message) => {
-    const args = message.content.split(" ");
+    client.on("messageCreate", async (message) => {
     if (message.author.bot || !message.guild) return;
 
-    addXP(message.author.id, message.guild);
     const content = message.content.toLowerCase();
+    const args = message.content.split(" ");
 
-    // =======================
-    // HELP COMMAND
-    // =======================
+    // 1. XP LOGIC
+    let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
+    if (!userData) {
+        userData = new User({ userId: message.author.id, guildId: message.guild.id });
+    }
+
+    userData.xp += 10; 
+    const nextLevelXP = userData.level * 100;
+    if (userData.xp >= nextLevelXP) {
+        userData.level++;
+        message.reply(`✨ **Level Up!** You've reached level **${userData.level}**, little pixie! 🧚‍♀️`);
+    }
+    await userData.save();
+
+    // 2. HELP COMMAND
     if (content === "!help") {
         const embed = new EmbedBuilder()
             .setColor(0xff66cc)
@@ -395,210 +398,139 @@ client.on("messageCreate", async (message) => {
             .setDescription("Everything I can do ✨")
             .addFields(
                 { name: "🎭 Reaction Roles", value: "`!roles`" },
-                { name: "📊 Leveling System", value: "`!rank` | `!leaderboard`" },
-                { name: "💰 Economy", value: "`!daily` | `!bal` | `!work`" },
-                { name: "💬 Fun Commands", value: "`!hello` | Mention me" },
-                { name: "🏓 Ping Pong!", value: "`!pingpong`" }
+                { name: "📊 Leveling", value: "`!rank` | `!leaderboard` | `!daily`" },
+                { name: "💰 Economy", value: "`!bal` | `!work` | `!slots`" },
+                { name: "💬 Fun", value: "`!hello` | `!pingpong`" }
             )
-            .setFooter({ text: "💜 built for activity + community engagement" });
+            .setFooter({ text: "💜 built for activity + community" });
 
         return message.channel.send({ embeds: [embed] });
-    } // <--- HELP ENDS HERE
+    }
 
-
-    // Updated !roles command for Individual Panels
+    // 3. ADMIN ROLES COMMAND
     if (content === "!roles" && message.member.permissions.has("Administrator")) {
         for (const panel of panels) {
             let text = `**${panel.title}**\n`;
             const emojisToReact = [];
-            
             Object.entries(panel.roles).forEach(([emoji, name]) => {
                 text += `${emoji} → ${name}\n`;
                 emojisToReact.push(emoji);
             });
 
             const sentMsg = await message.channel.send(text);
-            
-            // Save each individual message ID to the database
-            db.run("INSERT OR REPLACE INTO role_messages (message_id, guild_id) VALUES (?, ?)", [sentMsg.id, message.guild.id]);
+            await RoleMessage.findOneAndUpdate(
+                { messageId: sentMsg.id }, 
+                { guildId: message.guild.id }, 
+                { upsert: true }
+            );
 
-            // React with only the emojis for this specific category
             for (const emoji of emojisToReact) {
                 await sentMsg.react(emoji).catch(() => {});
-                await new Promise(r => setTimeout(r, 450)); // Prevent Discord rate limit
+                await new Promise(r => setTimeout(r, 450)); 
             }
         }
         return;
     }
 
+    // 4. XP & ECONOMY COMMANDS
     if (content === "!rank") {
-        db.get("SELECT * FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
-            const xp = row?.xp || 0;
-            const level = row?.level || 0;
-            const nextXP = Math.floor(Math.pow((level + 1) / 0.1, 2));
-            
-            const embed = new EmbedBuilder()
-                .setColor(0xff66cc)
-                .setTitle(`💜 ${message.author.username}'s Rank`)
-                .setThumbnail(message.author.displayAvatarURL())
-                .addFields(
-                    { name: "📊 Level", value: `${level}`, inline: true },
-                    { name: "✨ XP", value: `${xp}`, inline: true },
-                    { name: "🎯 Next Level", value: `${nextXP} XP`, inline: true }
-                );
-            message.reply({ embeds: [embed] });
-        });
-        return;
+        const nextXP = Math.floor(Math.pow((userData.level + 1) / 0.1, 2));
+        const embed = new EmbedBuilder()
+            .setColor(0xffc1e3)
+            .setTitle(`✨ ${message.author.username}'s Rank`)
+            .setThumbnail(message.author.displayAvatarURL())
+            .addFields(
+                { name: "📊 Level", value: `${userData.level}`, inline: true },
+                { name: "✨ XP", value: `${userData.xp}`, inline: true },
+                { name: "🎯 Next Level", value: `${nextXP} XP`, inline: true }
+            );
+        return message.reply({ embeds: [embed] });
     }
 
     if (content === "!daily") {
         const now = Date.now();
-        db.get("SELECT last_daily FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
-            if (row && now - row.last_daily < 86400000) {
-                const remaining = Math.ceil((86400000 - (now - row.last_daily)) / 3600000);
-                return message.reply(`Slow down! Try again in ${remaining} hours. 💜`);
-            }
-            db.run("UPDATE users SET xp = xp + 50, last_daily = ? WHERE user_id = ?", [now, message.author.id]);
-            message.reply("✨ You claimed your daily **50 XP**! 💜");
-        });
-        return;
+        if (now - userData.lastDaily < 86400000) {
+            const remaining = Math.ceil((86400000 - (now - userData.lastDaily)) / 3600000);
+            return message.reply(`Slow down, little pixie! Try again in ${remaining} hours. 🎀`);
+        }
+        userData.xp += 50;
+        userData.lastDaily = now;
+        await userData.save();
+        return message.reply("✨ You claimed your daily **50 XP**! 🪄");
     }
 
     if (content === "!leaderboard") {
-        db.all("SELECT user_id, xp, level FROM users ORDER BY xp DESC LIMIT 10", async (err, rows) => {
-            if (err || !rows) return;
-            const list = await Promise.all(rows.map(async (r, i) => {
-                const u = await client.users.fetch(r.user_id).catch(() => ({ username: "Unknown" }));
-                return `**${i + 1}.** ${u.username} • Lvl ${r.level} (${r.xp} XP)`;
-            }));
-            const embed = new EmbedBuilder()
-                .setColor(0x00ccff)
-                .setTitle("🏆 XP Leaderboard")
-                .setDescription(list.join("\n") || "No one yet!");
-            message.channel.send({ embeds: [embed] });
-        });
-        return;
-    }
-    // --- START ECONOMY LOGIC ---
-    
-    // 1. Passive Income: 10% chance to find $1-5 when chatting
-    const moneyFound = Math.random() < 0.1 ? Math.floor(Math.random() * 5) + 1 : 0;
-    if (moneyFound > 0) {
-        db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [moneyFound, message.author.id]);
+        const topUsers = await User.find().sort({ xp: -1 }).limit(10);
+        const list = await Promise.all(topUsers.map(async (r, i) => {
+            const u = await client.users.fetch(r.userId).catch(() => ({ username: "Unknown" }));
+            return `**${i + 1}.** ${u.username} • Lvl ${r.level} (${r.xp} XP)`;
+        }));
+        const embed = new EmbedBuilder()
+            .setColor(0xffc1e3)
+            .setTitle("🏆 Fairy Leaderboard")
+            .setDescription(list.join("\n") || "No magic here yet!");
+        return message.channel.send({ embeds: [embed] });
     }
 
-    // 2. !bal / !balance
     if (content === "!bal" || content === "!balance") {
-        db.get("SELECT balance FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
-            const bal = row?.balance || 0;
-            message.reply(`💰 **${message.author.username}**, you have **$${bal}** in your wallet!`);
-        });
-        return;
+        return message.reply(`💰 **${message.author.username}**, you have **$${userData.balance || 0}** in your pouch!`);
     }
 
-    // 3. !work
     if (content === "!work") {
         const payout = Math.floor(Math.random() * 50) + 20;
-        db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [payout, message.author.id]);
-        message.reply(`🛠️ You worked a shift and earned **$${payout}**!`);
-        return;
+        userData.balance += payout;
+        await userData.save();
+        return message.reply(`🛠️ You worked a fairy shift and earned **$${payout}**!`);
     }
 
-    // 4. !slots <amount>
     if (args[0] === "!slots") {
         const bet = parseInt(args[1]);
         if (!bet || bet <= 0) return message.reply("How much do you want to bet? usage: `!slots 50` 💜");
-        
-        db.get("SELECT balance FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
-            if (!row || row.balance < bet) return message.reply("You're broke! Work a bit more first. 💸");
+        if (userData.balance < bet) return message.reply("You're broke! Work a bit more first. 💸");
 
-            const icons = ["🍒", "💎", "⭐", "🍎"];
-            const r1 = icons[Math.floor(Math.random() * icons.length)];
-            const r2 = icons[Math.floor(Math.random() * icons.length)];
-            const r3 = icons[Math.floor(Math.random() * icons.length)];
+        const icons = ["🍒", "💎", "⭐", "🍎"];
+        const [r1, r2, r3] = [0, 0, 0].map(() => icons[Math.floor(Math.random() * icons.length)]);
 
-            if (r1 === r2 && r2 === r3) {
-                const win = bet * 5;
-                db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [win, message.author.id]);
-                message.reply(`[ ${r1} | ${r2} | ${r3} ]\n**JACKPOT!** You won **$${win}**! 🎉`);
-            } else {
-                db.run("UPDATE users SET balance = balance - ? WHERE user_id = ?", [bet, message.author.id]);
-                message.reply(`[ ${r1} | ${r2} | ${r3} ]\nYou lost **$${bet}**. Better luck next time! 💜`);
-            }
-        });
-        return;
+        if (r1 === r2 && r2 === r3) {
+            userData.balance += (bet * 5);
+            await userData.save();
+            return message.reply(`[ ${r1} | ${r2} | ${r3} ]\n**JACKPOT!** You won **$${bet * 5}**! 🎉`);
+        } else {
+            userData.balance -= bet;
+            await userData.save();
+            return message.reply(`[ ${r1} | ${r2} | ${r3} ]\nYou lost **$${bet}**. 🪄`);
+        }
     }
 
-    // 5. !shop
-    if (content === "!shop") {
-        const list = shopItems.map((item, i) => `**${i+1}. ${item.name}** — $${item.price}\n*${item.description}*`).join("\n\n");
-        const embed = new EmbedBuilder()
-            .setTitle("🛍️ Server Shop")
-            .setDescription(list)
-            .setColor(0xffcc00)
-            .setFooter({ text: "Use !buy <number> to purchase!" });
-        message.channel.send({ embeds: [embed] });
-        return;
-    }
-
-    // --- END ECONOMY LOGIC ---
-// --- FEATURE: Ping Pong Game ---
+    // 5. FUN & PERSONALITY
     if (content === "!pingpong") {
         let score = 0;
         await message.channel.send("🏓 **Game on!** I'll start...\n**PING!**");
-
-        // The filter ensures Hera only listens to the person who started the game
-        const filter = m => m.author.id === message.author.id && 
-                           (m.content.toLowerCase() === "pong" || m.content.toLowerCase() === "ping");
-        
-        // Collector lasts for 10 seconds per turn
+        const filter = m => m.author.id === message.author.id && ["ping", "pong"].includes(m.content.toLowerCase());
         const collector = message.channel.createMessageCollector({ filter, time: 10000 });
 
         collector.on('collect', async m => {
             score++;
-            // If you say ping, she says pong. If you say pong, she says ping.
             const response = m.content.toLowerCase() === "ping" ? "**PONG!**" : "**PING!**";
-            
             await m.channel.send(`${response} (Score: ${score})`);
-            
-            // Reset the 10-second timer so you have time for the next hit
             collector.resetTimer(); 
         });
 
         collector.on('end', (collected, reason) => {
-            if (reason === 'time') {
-                message.channel.send(`⏱️ **Time's up!** You missed the ball. Final Score: **${score}** 💜`);
-            }
+            if (reason === 'time') message.channel.send(`⏱️ **Time's up!** Score: **${score}** 💜`);
         });
         return;
     }
-    // Personality triggers
-    if (message.mentions.has(client.user)) {
-        return message.reply(pick(responses[currentMood].mention));
-    }
-    if (content.includes("hello") || content.includes("hi bot")) {
-        return message.reply(pick(responses[currentMood].hello));
-    }
-    if (Math.random() < 0.010) {
-        return message.reply(pick(responses[currentMood].default));
-    }
-    const activeContent = content.toLowerCase();
-    if (activeContent.includes("love you bot")) {
-        return message.reply("aww, love you too! 💜");
-    }
-    if (activeContent.includes("bot is mid")) {
-        return message.reply("EXCUSE ME? 💀💥");
-    }
-    if (activeContent.includes("go to sleep")) {
-        return message.reply("I never sleep... I'm always watching. 👀💜");
-    }
 
-    // C. Pure Randomness (Adjust the 0.05 to change how yappy the bot is)
-    if (Math.random() < 0.05) { 
-        return message.reply(pick(responses[currentMood].default));
-    }
-});
+    if (message.mentions.has(client.user)) return message.reply(pick(responses[currentMood].mention));
+    if (content.includes("hello") || content.includes("hi bot")) return message.reply(pick(responses[currentMood].hello));
+    
+    // Passive responses
+    if (Math.random() < 0.05) return message.reply(pick(responses[currentMood].default));
 
+}); // <--- THIS IS THE CORRECT CLOSING FOR THE MESSAGE LISTENER
+
+// Keep your toggleRole function and client.login logic BELOW this point.
 // =======================
 // REACTION LOGIC
 // =======================
@@ -606,24 +538,23 @@ async function toggleRole(reaction, user, add = true) {
     if (user.bot || !reaction.message.guild) return;
     if (reaction.partial) await reaction.fetch().catch(() => {});
 
-    // Check if the message is in our role_messages database
-    db.get("SELECT * FROM role_messages WHERE message_id = ?", [reaction.message.id], async (err, row) => {
-        if (!row) return;
+    // MongoDB check instead of db.get
+    const row = await RoleMessage.findOne({ messageId: reaction.message.id });
+    if (!row) return;
 
-        const roleName = reactionRolesMap[reaction.emoji.name];
-        if (!roleName) return;
+    const roleName = reactionRolesMap[reaction.emoji.name];
+    if (!roleName) return;
 
-        const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
-        const member = await reaction.message.guild.members.fetch(user.id).catch(() => {});
+    const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+    const member = await reaction.message.guild.members.fetch(user.id).catch(() => {});
 
-        if (role && member) {
-            if (add) {
-                await member.roles.add(role).catch(e => console.error(`Add role error: ${e}`));
-            } else {
-                await member.roles.remove(role).catch(e => console.error(`Remove role error: ${e}`));
-            }
+    if (role && member) {
+        if (add) {
+            await member.roles.add(role).catch(e => console.error(`Add role error: ${e}`));
+        } else {
+            await member.roles.remove(role).catch(e => console.error(`Remove role error: ${e}`));
         }
-    });
+    }
 }
 
 client.on("messageReactionAdd", (r, u) => toggleRole(r, u, true));
