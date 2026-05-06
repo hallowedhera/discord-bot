@@ -345,14 +345,14 @@ client.on("messageCreate", async (message) => {
 if (content === "!roles") {
   try {
     let text = "🎭 **React Roles Panel**\n\n";
-    const reactions = [];
+    const reactions = new Set();
 
     for (const panel of panels) {
       text += `**${panel.title}**\n`;
 
       for (const [emoji, role] of Object.entries(panel.roles)) {
         text += `${emoji} → ${role}\n`;
-        reactions.push(emoji);
+        reactions.add(emoji);
       }
 
       text += `\n`;
@@ -360,26 +360,23 @@ if (content === "!roles") {
 
     const msg = await message.channel.send(text);
 
-    // clear old record (prevents DB conflicts)
-    db.run("DELETE FROM role_messages WHERE guild_id=?", [message.guild.id]);
+    db.run("DELETE FROM role_messages WHERE guild_id=?", [
+      message.guild.id
+    ]);
 
-    // save new message
     db.run("INSERT INTO role_messages VALUES (?, ?)", [
       message.guild.id,
       msg.id
     ]);
 
-    // add reactions ONCE on the same message
     for (const emoji of reactions) {
       try {
         await msg.react(emoji);
-      } catch (err) {
-        console.log("❌ Failed to react:", emoji);
-      }
+      } catch {}
     }
 
   } catch (err) {
-    console.error("Roles command error:", err);
+    console.error(err);
   }
 
   return;
