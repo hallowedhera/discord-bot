@@ -37,11 +37,13 @@ app.listen(PORT, () => console.log(`🌿 Forest Monitoring active on port ${PORT
 
 // 4. INITIALIZE DATABASE
 // =======================
-// DATABASE INIT (MONGODB)
-// =======================
-mongoose.connect(process.env.MONGO_URI)
+// 4. INITIALIZE DATABASE
+mongoose.connect(MONGO_URI) // Use the variable you defined at the top
     .then(() => console.log("✨ Connected to the Fairy Cloud (MongoDB)!"))
-    .catch(err => console.error("❌ MongoDB Connection Error:", err));
+    .catch(err => {
+        console.error("❌ MongoDB Connection Error:", err.message);
+        console.log("⚠️ Continuing without DB - leveling/economy will fail.");
+    });
 
 const userSchema = new mongoose.Schema({
     userId: String,
