@@ -8,9 +8,13 @@ const {
 const sqlite3 = require("sqlite3").verbose();
 const path = require("path");
 const express = require("express");
+// =======================
+// KEEP-ALIVE SERVER
+// =======================
 const app = express();
-app.get("/", (req, res) => res.send("Bot is awake! 💜"));
-app.listen(process.env.PORT || 10000);
+app.get("/", (req, res) => res.send("Bot is active."));
+app.listen(PORT, () => console.log(`Keep-alive server on port ${PORT}`));
+
 
 // =======================
 // CONFIG & ENV
