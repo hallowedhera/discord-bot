@@ -268,15 +268,15 @@ client.on("guildMemberAdd", async (member) => {
             return;
         }
 
-      const welcomeEmbed = new EmbedBuilder()
-    .setColor(0x7fb069) // A soft mossy green
-    .setTitle("🍄 A new friend has wandered in... 🌿")
-    .setDescription(`Hi <@${member.id}>! 🍓\nWelcome to **${member.guild.name}**!`)
+const welcomeEmbed = new EmbedBuilder()
+    .setColor(0xffc1e3) // A soft, dreamy fairy pink
+    .setTitle("✨ A new member has joined! 🧚‍♀️")
+    .setDescription(`hi hi <@${member.id}>! 🎀\nWelcome to the magic of **${member.guild.name}**! 🫧`)
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-    .setFooter({ text: `Friend #${member.guild.memberCount} 🧺` });
+    .setFooter({ text: `Magical Member #${member.guild.memberCount} 🪄` });
 
-await channel.send({ content: `Welcome 🌿 <@${member.id}>!`, embeds: [welcomeEmbed] });
-        console.log("✅ Welcome message sent successfully!");
+await channel.send({ content: `Welcome ✨ <@${member.id}>!`, embeds: [welcomeEmbed] });
+console.log("✅ Fairy welcome message sent successfully!");
 
     } catch (e) {
         console.error("Welcome System Error:", e.message);
