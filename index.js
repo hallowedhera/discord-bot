@@ -204,7 +204,7 @@ const client = new Client({
 // =======================
 async function addXP(userId, guild) {
     const gain = Math.floor(Math.random() * 6) + 5;
-    db.get("SELECT * FROM users WHERE user_id = ?", [userId], (err, row) => {
+    db.get("SELECT * FROM users WHERE user_id = ?", [userId], async (err, row) => {
         if (err) return;
         if (!row) {
             db.run("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", [userId, gain, 0]);
@@ -216,6 +216,23 @@ async function addXP(userId, guild) {
             if (newLevel > row.level) {
                 const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
                 if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
+
+                // ✨ Chatterling Role Reward at Level 10
+                if (newLevel >= 10) {
+                    try {
+                        const member = await guild.members.fetch(userId);
+                        const chatterlingRole = guild.roles.cache.find(r => r.name === "Chatterling");
+
+                        if (member && chatterlingRole) {
+                            if (!member.roles.cache.has(chatterlingRole.id)) {
+                                await member.roles.add(chatterlingRole);
+                                if (channel) channel.send(`✨ <@${userId}> has been promoted to **Chatterling**! 🎀`);
+                            }
+                        }
+                    } catch (e) {
+                        console.error("Failed to assign Chatterling role:", e.message);
+                    }
+                }
             }
         }
     });
