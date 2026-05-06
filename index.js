@@ -18,7 +18,6 @@ const PORT = process.env.PORT || 10000;
 // 1. Define everything first
 const express = require("express");
 const path = require("path");
-const PORT = process.env.PORT || 10000; // Move this up!
 
 // 2. Start the Keep-Alive server
 const app = express();
