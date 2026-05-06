@@ -317,14 +317,33 @@ client.on("messageCreate", async (message) => {
 
   const content = message.content.toLowerCase();
 
-  if (content === "!roles") {
-    let text = "🎭 **React Roles Panel**\n\n";
-    panels.forEach(p => {
-      text += `**${p.title}**\n${p.description}\n\n`;
-    });
-    return message.channel.send(text);
+if (content === "!roles") {
+  let text = "🎭 **React Roles Panel**\n\n";
+
+  panels.forEach(p => {
+    text += `**${p.title}**\n${p.description}\n\n`;
+  });
+
+  const msg = await message.channel.send(text);
+
+  db.run(
+    "INSERT INTO role_messages VALUES (?, ?)",
+    [message.guild.id, msg.id]
+  );
+
+  // ✅ ADD REACTIONS AUTOMATICALLY
+  const emojiList = Object.keys(reactionRoles);
+
+  for (const emoji of emojiList) {
+    try {
+      await msg.react(emoji);
+    } catch (err) {
+      console.log("Failed to react with:", emoji);
+    }
   }
 
+  return;
+}
   if (content === "!hello") {
     return message.reply(pick(responses[currentMood].hello));
   }
