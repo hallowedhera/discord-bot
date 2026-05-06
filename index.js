@@ -15,6 +15,7 @@ http.createServer((req, res) => {
 });
 
 console.log("SCRIPT STARTED");
+
 process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
@@ -60,6 +61,19 @@ let twitchToken = null;
 let isLive = false;
 let lastVideo = null;
 let lastTikTok = null;
+
+// =======================
+// HELPERS
+// =======================
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+const personality = {
+  hello: ["hey hey 💜", "hi hi 💜", "hello 💜", "yo 💜"],
+  howareyou: ["I’m good 💜 just vibing", "doing great 💜", "pretty chill rn 💜"],
+  thanks: ["anytime 💜", "no problem 💜", "of course 💜"]
+};
 
 // =======================
 // TWITCH TOKEN
@@ -135,7 +149,6 @@ async function checkYouTube() {
 
   if (lastVideo !== latest.id) {
     lastVideo = latest.id;
-
     channel.send(`🎥 **New YouTube Video!**\n${latest.link}`);
   }
 }
@@ -155,7 +168,6 @@ async function checkTikTok() {
 
   if (lastTikTok !== latest.link) {
     lastTikTok = latest.link;
-
     channel.send(`🎵 **New TikTok!**\n${latest.link}`);
   }
 }
@@ -183,58 +195,70 @@ const reactionRoles = {
 };
 
 // =======================
-// BOT CHAT RESPONSES (NEW)
+// CHAT SYSTEM + PERSONALITY + FUN COMMANDS
 // =======================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const content = message.content.toLowerCase();
 
-  // If someone mentions the bot
+  // mention reply
   if (message.mentions.has(client.user)) {
-    return message.reply("hey 💜 how can I help?");
+    return message.reply("hey 💜 I’m here!");
   }
 
-  // Simple commands
-  if (content === "!ping") {
-    return message.reply("🏓 pong!");
+  // help system
+  if (content === "help" || content === "!help") {
+    return message.reply(
+      "💜 **Hera Help Menu**\n\n" +
+      "• !roles → pick roles\n" +
+      "• !ping → test bot\n" +
+      "• !roll → roll a dice\n" +
+      "• !8ball → ask a question\n\n" +
+      "💬 You can also just talk to me!"
+    );
   }
 
-  if (content === "!hello") {
-    return message.reply("hi hi 💜");
+  // fun commands
+  if (content === "!ping") return message.reply("🏓 pong!");
+
+  if (content === "!roll") {
+    return message.reply(`🎲 ${Math.floor(Math.random() * 6) + 1}`);
+  }
+
+  if (content.startsWith("!8ball")) {
+    const answers = ["yes 💜", "no ❌", "maybe 👀", "absolutely ✨", "not sure"];
+    return message.reply(`🎱 ${pick(answers)}`);
+  }
+
+  // personality replies
+  if (content.includes("hello") || content.includes("hi")) {
+    return message.reply(pick(personality.hello));
+  }
+
+  if (content.includes("how are you")) {
+    return message.reply(pick(personality.howareyou));
+  }
+
+  if (content.includes("thanks")) {
+    return message.reply(pick(personality.thanks));
+  }
+
+  if (content.includes("what can you do")) {
+    return message.reply("💜 I help with roles, chat, fun commands & stream alerts!");
   }
 });
 
 // =======================
-// PANELS (UNCHANGED)
+// AUTO ENGAGEMENT
 // =======================
-const panels = [
-  {
-    title: "Platforms ♡",
-    description: "💻 PC\n🎮 Console",
-    emojis: ["💻", "🎮"]
-  },
-  {
-    title: "Games ♡",
-    description:
-      "🔪 Dead by Daylight\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky Time",
-    emojis: ["🔪", "💥", "🍄", "🔴", "🕯️"]
-  },
-  {
-    title: "Identity & Age ♡",
-    description:
-      "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM's Open\n\n🔞 18+\n🧸 Under 18",
-    emojis: ["♀️", "♂️", "🫧", "💌", "🔞", "🧸"]
-  },
-  {
-    title: "Server ♡",
-    description:
-      "🎬 Movie Night\n🤝 Partner Servers\n🎉 Server Events",
-    emojis: ["🎬", "🤝", "🎉"]
-  }
+const engagementMessages = [
+  "💜 what are you all up to?",
+  "🎮 anyone playing anything?",
+  "💬 say hi if you're here",
+  "🔥 what games today?",
+  "👀 lurking or chatting?"
 ];
-
-let roleMessageIDs = [];
 
 // =======================
 // READY
@@ -250,77 +274,14 @@ client.once('ready', () => {
   setInterval(checkTwitch, 60000);
   setInterval(checkYouTube, 120000);
   setInterval(checkTikTok, 180000);
-});
 
-// =======================
-// SEND ROLE MENU
-// =======================
-client.on('messageCreate', async (message) => {
-  if (message.content !== '!roles') return;
+  // auto engagement
+  setInterval(() => {
+    const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+    if (!channel) return;
 
-  roleMessageIDs = [];
-
-  await message.channel.send("**Hera's Hollow Role Menu 💜**");
-
-  for (const panel of panels) {
-    const msg = await message.channel.send(
-      `**${panel.title}**\n\n${panel.description}`
-    );
-
-    roleMessageIDs.push(msg.id);
-
-    for (const emoji of panel.emojis) {
-      await msg.react(emoji);
-    }
-  }
-});
-
-// =======================
-// ROLE ADD
-// =======================
-client.on('messageReactionAdd', async (reaction, user) => {
-  if (user.bot) return;
-
-  if (reaction.partial) await reaction.fetch();
-  if (reaction.message.partial) await reaction.message.fetch();
-
-  if (!reaction.message.guild) return;
-  if (!roleMessageIDs.includes(reaction.message.id)) return;
-
-  const roleName = reactionRoles[reaction.emoji.name];
-  if (!roleName) return;
-
-  const guild = reaction.message.guild;
-  const member = await guild.members.fetch(user.id);
-  const role = guild.roles.cache.find(r => r.name === roleName);
-
-  if (!role) return;
-
-  await member.roles.add(role);
-});
-
-// =======================
-// ROLE REMOVE
-// =======================
-client.on('messageReactionRemove', async (reaction, user) => {
-  if (user.bot) return;
-
-  if (reaction.partial) await reaction.fetch();
-  if (reaction.message.partial) await reaction.message.fetch();
-
-  if (!reaction.message.guild) return;
-  if (!roleMessageIDs.includes(reaction.message.id)) return;
-
-  const roleName = reactionRoles[reaction.emoji.name];
-  if (!roleName) return;
-
-  const guild = reaction.message.guild;
-  const member = await guild.members.fetch(user.id);
-  const role = guild.roles.cache.find(r => r.name === roleName);
-
-  if (!role) return;
-
-  await member.roles.remove(role);
+    channel.send(pick(engagementMessages));
+  }, 1000 * 60 * 45);
 });
 
 // =======================
