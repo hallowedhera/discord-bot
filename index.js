@@ -27,7 +27,6 @@ const {
 } = require("discord.js"); // <--- This is what defines "Client"
 
 // 2. CONFIG & PORT
-const TOKEN = process.env.DISCORD_TOKEN;
 const PORT = process.env.PORT || 10000;
 
 // 3. START KEEP-ALIVE SERVER
