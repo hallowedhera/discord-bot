@@ -269,46 +269,6 @@ function sendAlert(msg) {
 }
 
 // =======================
-// YOUTUBE
-// =======================
-async function checkYouTube() {
-  try {
-    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`;
-    const feed = await parser.parseURL(url);
-
-    const latest = feed.items[0];
-    if (!latest) return;
-
-    const videoId =
-  latest.id?.split(":").pop() ||
-  latest.link;
-  if (!videoId || videoId.includes("w.youtube.com")) return;
-
-    // check DB instead of memory
-    db.get(
-      "SELECT post_id FROM seen_social WHERE platform=? AND post_id=?",
-      ["youtube", videoId],
-      (err, row) => {
-        if (err) return console.error(err);
-        if (row) return; // already sent
-
-        // insert new record
-        db.run(
-          "INSERT INTO seen_social VALUES (?, ?)",
-          ["youtube", videoId]
-        );
-
-        sendAlert(
-          `📺 **New YouTube Upload!**\n${latest.title}\n${latest.link}`
-        );
-      }
-    );
-  } catch (e) {
-    console.log("YouTube error:", e.message);
-  }
-}
-
-// =======================
 // TWITCH
 // =======================
 async function checkTwitch() {
@@ -381,65 +341,52 @@ client.on("messageCreate", async (message) => {
 // ✅ REACTION ROLE SYSTEM
 // =======================
 
-// ADD ROLE
-client.on("messageReactionAdd", async (reaction, user) => {
-  if (user.bot) return;
+if (content === "!roles") {
+  try {
+    let text = "🎭 **React Roles Panel**\n\n";
 
-  if (reaction.partial) await reaction.fetch();
-  if (reaction.message.partial) await reaction.message.fetch();
+    const allReactions = [];
 
-  db.get(
-    "SELECT message_id FROM role_messages WHERE guild_id=?",
-    [reaction.message.guild.id],
-    async (err, row) => {
-      if (err || !row) return;
+    for (const panel of panels) {
+      text += `**${panel.title}**\n`;
 
-      if (reaction.message.id !== row.message_id) return;
+      for (const [emoji, role] of Object.entries(panel.roles)) {
+        text += `${emoji} → ${role}\n`;
+        allReactions.push(emoji);
+      }
 
-      const panel = panels.find(p =>
-        Object.keys(p.roles).includes(reaction.emoji.name)
-      );
-      if (!panel) return;
-
-      const roleName = panel.roles[reaction.emoji.name];
-      const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
-      if (!role) return;
-
-      const member = await reaction.message.guild.members.fetch(user.id);
-      member.roles.add(role).catch(console.error);
+      text += `\n`;
     }
-  );
-});
 
-// REMOVE ROLE
-client.on("messageReactionRemove", async (reaction, user) => {
-  if (user.bot) return;
+    const msg = await message.channel.send(text);
 
-  if (reaction.partial) await reaction.fetch();
-  if (reaction.message.partial) await reaction.message.fetch();
+    // 🧠 clear old saved message for this guild (prevents conflicts)
+    db.run(
+      "DELETE FROM role_messages WHERE guild_id=?",
+      [message.guild.id]
+    );
 
-  db.get(
-    "SELECT message_id FROM role_messages WHERE guild_id=?",
-    [reaction.message.guild.id],
-    async (err, row) => {
-      if (err || !row) return;
+    // save new one
+    db.run(
+      "INSERT INTO role_messages VALUES (?, ?)",
+      [message.guild.id, msg.id]
+    );
 
-      if (reaction.message.id !== row.message_id) return;
-
-      const panel = panels.find(p =>
-        Object.keys(p.roles).includes(reaction.emoji.name)
-      );
-      if (!panel) return;
-
-      const roleName = panel.roles[reaction.emoji.name];
-      const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
-      if (!role) return;
-
-      const member = await reaction.message.guild.members.fetch(user.id);
-      member.roles.remove(role).catch(console.error);
+    // ✅ add reactions safely
+    for (const emoji of allReactions) {
+      try {
+        await msg.react(emoji);
+      } catch (err) {
+        console.log("❌ Failed to react:", emoji, err.message);
+      }
     }
-  );
-});
+
+  } catch (err) {
+    console.error("Roles command error:", err);
+  }
+
+  return;
+}
   if (content === "!hello") {
     return message.reply(pick(responses[currentMood].hello));
   }
@@ -524,6 +471,9 @@ client.once("ready", () => {
     activities: [{ name: "💜 Always On ✨", type: 0 }]
   });
 });
+setInterval(() => {
+  sendAlert("💜 just checking in... I'm still here!");
+}, 1000 * 60 * 30);
 
 // =======================
 // LOGIN
