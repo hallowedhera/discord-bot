@@ -267,8 +267,8 @@ client.on("guildMemberAdd", async (member) => {
             .setDescription(`hi hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**! We are so happy you're here. ✨`)
             .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
             .addFields(
-                { name: "📜 Rules", value: "Check out #rules to get started!", inline: true },
-                { name: "🎭 Roles", value: "Grab your roles in !roles", inline: true }
+                { name: "📜 Rules", value: "Check out the rules channel to get started!", inline: true },
+                { name: "🎭 Roles", value: "Grab your roles in the get roles channel!", inline: true }
             )
             .setFooter({ text: `Member #${member.guild.memberCount} 🎀` })
             .setTimestamp();
