@@ -6,8 +6,11 @@ const {
     ActivityType 
 } = require("discord.js");
 const sqlite3 = require("sqlite3").verbose();
-const express = require("express");
 const path = require("path");
+const express = require("express");
+const app = express();
+app.get("/", (req, res) => res.send("Bot is awake! 💜"));
+app.listen(process.env.PORT || 10000);
 
 // =======================
 // CONFIG & ENV
