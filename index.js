@@ -327,10 +327,20 @@ client.on("messageReactionRemove", async (reaction, user) => {
 });
 
 // =======================
-// READY
+// READY (CUTE UPDATE ADDED 💜✨)
 // =======================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
+
+  client.user.setPresence({
+    status: "online",
+    activities: [
+      {
+        name: "💜 Always On • watching the server ✨",
+        type: 0
+      }
+    ]
+  });
 
   setInterval(checkTwitch, 60000);
   setInterval(checkYouTube, 120000);
