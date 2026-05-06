@@ -5,6 +5,7 @@ const TOKEN = process.env.DISCORD_TOKEN;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID || ALERT_CHANNEL_ID;
 const PORT = process.env.PORT || 10000;
+const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 
 const { 
     Client, 
@@ -39,7 +40,87 @@ const db = new sqlite3.Database(dbPath);
     )`);
     db.run(`CREATE TABLE IF NOT EXISTS role_messages (message_id TEXT PRIMARY KEY, guild_id TEXT)`);
 });
+// =======================
+// ALERTS
+// =======================
+async function sendAlert(msg) {
+  try {
+    if (!ALERT_CHANNEL_ID) return;
 
+    const channel = await client.channels.fetch(ALERT_CHANNEL_ID);
+    if (!channel) return;
+
+    channel.send(msg);
+  } catch (e) {
+    console.log("Alert error:", e.message);
+  }
+}
+const seenTwitchLive = new Set();
+
+async function checkTwitch() {
+  try {
+    const token = await axios.post(
+      `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`
+    );
+
+    const access = token.data.access_token;
+
+    const res = await axios.get(
+      `https://api.twitch.tv/helix/streams?user_login=${TWITCH_USERNAME}`,
+      {
+        headers: {
+          "Client-ID": TWITCH_CLIENT_ID,
+          Authorization: `Bearer ${access}`
+        }
+      }
+    );
+
+    const isLive = res.data.data.length > 0;
+
+    if (isLive && !seenTwitchLive.has(TWITCH_USERNAME)) {
+      seenTwitchLive.add(TWITCH_USERNAME);
+
+      sendAlert(
+        `🔴 **LIVE NOW ON TWITCH**\nhttps://twitch.tv/${TWITCH_USERNAME}`
+      );
+    }
+
+    if (!isLive) {
+      seenTwitchLive.delete(TWITCH_USERNAME);
+    }
+
+  } catch (e) {
+    console.log("Twitch error:", e.message);
+  }
+}
+setInterval(checkTwitch, 90000);
+setInterval(checkTikTok, 120000);
+
+const seenTikTokVideo = new Set();
+
+async function checkTikTok() {
+  try {
+    const res = await axios.get(
+      `https://www.tiktok.com/@${TIKTOK_USERNAME}?lang=en`
+    );
+
+    const match = res.data.match(/video\/(\d{15,})/g);
+    if (!match) return;
+
+    const latest = match[0];
+
+    if (seenTikTokVideo.has(latest)) return;
+
+    seenTikTokVideo.add(latest);
+
+    sendAlert(
+      `🎵 **New TikTok Posted!**\nhttps://tiktok.com/@${TIKTOK_USERNAME}`
+    );
+
+  } catch (e) {
+    console.log("TikTok error:", e.message);
+  }
+}
 // =======================
 // PERSONALITY SYSTEM
 // =======================
@@ -203,6 +284,46 @@ client.on("messageCreate", async (message) => {
 
     addXP(message.author.id, message.guild);
     const content = message.content.toLowerCase();
+    if (content === "!help") {
+  const embed = new EmbedBuilder()
+    .setColor(0xff66cc)
+    .setTitle("💜 Hera Bot Commands")
+    .setDescription("Everything I can do ✨")
+    .addFields(
+      {
+        name: "🎭 Reaction Roles",
+        value: "`!roles` → shows role categories you can react to"
+      },
+      {
+        name: "📊 Leveling System",
+        value:
+          "`!rank` → your XP + level\n`!leaderboard` → top users on the server"
+      },
+      {
+        name: "💰 Economy",
+        value:
+          "`!daily` → claim daily XP reward (if enabled)\nXP is gained automatically from chatting"
+      },
+      {
+        name: "💬 Fun Commands",
+        value:
+          "`!hello` → talk to the bot\nMention me → random replies"
+      },
+      {
+        name: "🔴 Live Alerts (Auto)",
+        value:
+          "• Twitch live notifications\n• TikTok new post alerts\n• Sent to #hera-alerts"
+      },
+      {
+        name: "⚙️ System",
+        value:
+          "Auto XP tracking\nReaction role system\nAlways-online alert system"
+      }
+    )
+    .setFooter({ text: "💜 built for activity + community engagement" });
+
+  return message.channel.send({ embeds: [embed] });
+}
 
     // Updated !roles command for Individual Panels
     if (content === "!roles" && message.member.permissions.has("Administrator")) {
