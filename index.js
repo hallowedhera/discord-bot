@@ -179,10 +179,42 @@ const reactionRoles = {
 };
 
 const panels = [
-  { title: "Platforms ♡", description: "💻 PC\n🎮 Console" },
-  { title: "Games ♡", description: "🔪 DBD\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky" },
-  { title: "Identity ♡", description: "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM Open\n🔞 18+\n🧸 Under 18" },
-  { title: "Server ♡", description: "🎬 Movie Night\n🤝 Partners\n🎉 Events" }
+  {
+    title: "Platforms ♡",
+    roles: {
+      "💻": "PC",
+      "🎮": "Console"
+    }
+  },
+  {
+    title: "Games ♡",
+    roles: {
+      "🔪": "DBD",
+      "💥": "Shooters",
+      "🍄": "Minecraft",
+      "🔴": "Pokemon",
+      "🕯️": "Spooky Time"
+    }
+  },
+  {
+    title: "Identity ♡",
+    roles: {
+      "♀️": "She/Her",
+      "♂️": "He/Him",
+      "🫧": "They/Them",
+      "💌": "DM'S Open",
+      "🔞": "18+",
+      "🧸": "Under 18"
+    }
+  },
+  {
+    title: "Server ♡",
+    roles: {
+      "🎬": "Movie Night",
+      "🤝": "Partner Servers",
+      "🎉": "Server Events"
+    }
+  }
 ];
 
 // =======================
@@ -345,9 +377,18 @@ client.on("messageCreate", async (message) => {
 if (content === "!roles") {
   let text = "🎭 **React Roles Panel**\n\n";
 
-  panels.forEach(p => {
-    text += `**${p.title}**\n${p.description}\n\n`;
-  });
+  const allReactions = [];
+
+  for (const panel of panels) {
+    text += `**${panel.title}**\n`;
+
+    for (const [emoji, role] of Object.entries(panel.roles)) {
+      text += `${emoji} → ${role}\n`;
+      allReactions.push(emoji);
+    }
+
+    text += `\n`;
+  }
 
   const msg = await message.channel.send(text);
 
@@ -356,17 +397,17 @@ if (content === "!roles") {
     [message.guild.id, msg.id]
   );
 
-  // ✅ ADD REACTIONS AUTOMATICALLY
-  const emojiList = Object.keys(reactionRoles);
-
-  for (const emoji of emojiList) {
+  // add reactions
+  for (const emoji of allReactions) {
     try {
       await msg.react(emoji);
-    } catch (err) {
-      console.log("Failed to react with:", emoji);
+    } catch (e) {
+      console.log("Failed reaction:", emoji);
     }
   }
 
+  return;
+}
   return;
 }
   if (content === "!hello") {
