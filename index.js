@@ -269,7 +269,7 @@ client.on("guildMemberAdd", async (member) => {
         const welcomeEmbed = new EmbedBuilder()
             .setColor(0xff66cc)
             .setTitle("✨ A new bestie has arrived! ✨")
-            .setDescription(`hi hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**!`)
+            .setDescription(`Hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**!`)
             .setThumbnail(member.user.displayAvatarURL());
 
         await channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
@@ -282,13 +282,27 @@ client.on("guildMemberAdd", async (member) => {
 // =======================
 // SYSTEM MONITORING (LEAVES)
 // =======================
+// =======================
+// SYSTEM MONITORING (LEAVES)
+// =======================
 client.on("guildMemberRemove", async (member) => {
     try {
-        const channel = member.guild.channels.cache.get(LEAVE_CHANNEL_ID);
-        if (!channel) return;
+        // Look directly at the Env Variable
+        const leaveChannelId = process.env.LEAVE_CHANNEL_ID;
+        
+        if (!leaveChannelId) {
+            return console.log("❌ Error: LEAVE_CHANNEL_ID is not defined in Render!");
+        }
+
+        // Use fetch to be 100% sure we find it
+        const channel = await member.guild.channels.fetch(leaveChannelId).catch(() => null);
+        
+        if (!channel) {
+            return console.log(`❌ Error: Could not find channel with ID ${leaveChannelId}`);
+        }
 
         const leaveEmbed = new EmbedBuilder()
-            .setColor(0xff0000) // Red for leaves
+            .setColor(0xff0000) 
             .setTitle("💔 Member Left")
             .setThumbnail(member.user.displayAvatarURL())
             .setDescription(`**${member.user.tag}** has left the server.`)
@@ -298,7 +312,9 @@ client.on("guildMemberRemove", async (member) => {
             )
             .setTimestamp();
 
-        channel.send({ embeds: [leaveEmbed] });
+        await channel.send({ embeds: [leaveEmbed] });
+        console.log(`✅ Leave log sent for ${member.user.tag}`);
+
     } catch (e) {
         console.error("Leave Log Error:", e.message);
     }
