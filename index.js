@@ -316,6 +316,11 @@ client.on("messageCreate", async (message) => {
         name: "⚙️ System",
         value:
           "Auto XP tracking\nReaction role system\nAlways-online alert system"
+      },
+       {
+        name: "Ping Pong!",
+        value:
+          "!pingpong → play a fun game of ping pong with the bot! 🏓"
       }
     )
     .setFooter({ text: "💜 built for activity + community engagement" });
