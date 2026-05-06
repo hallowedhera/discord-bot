@@ -26,15 +26,11 @@ db.serialize(() => {
 const http = require("http");
 const axios = require("axios");
 const Parser = require("rss-parser");
-const Canvas = require("canvas");
 
 const {
   Client,
   GatewayIntentBits,
-  Partials,
-  REST,
-  Routes,
-  SlashCommandBuilder
+  Partials
 } = require("discord.js");
 
 // =======================
@@ -65,18 +61,23 @@ const client = new Client({
     GatewayIntentBits.GuildMessageReactions,
     GatewayIntentBits.GuildMembers
   ],
-  partials: [Partials.Message, Partials.Channel, Partials.Reaction]
+  partials: [
+    Partials.Message,
+    Partials.Channel,
+    Partials.Reaction,
+    Partials.User,
+    Partials.GuildMember
+  ]
 });
 
-// extra safety logging (Render debugging)
 client.on("error", console.error);
 client.on("warn", console.warn);
 
 // =======================
 // CONFIG
 // =======================
-const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 const LEVEL_CHANNEL_ID = "1395485196266111017";
+const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
@@ -86,15 +87,6 @@ const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 
 const parser = new Parser();
-
-// =======================
-// MEMORY
-// =======================
-let twitchToken = null;
-let isLive = false;
-
-const seenVideos = new Set();
-const seenTikToks = new Set();
 
 // =======================
 // XP SYSTEM
@@ -157,7 +149,7 @@ function claimDaily(userId, cb) {
 }
 
 // =======================
-// ROLE SYSTEM (UNCHANGED)
+// ROLE SYSTEM
 // =======================
 const reactionRoles = {
   "💻": "PC",
@@ -179,169 +171,178 @@ const reactionRoles = {
 };
 
 const panels = [
-  { title: "Platforms ♡", description: "💻 PC\n🎮 Console", emojis: ["💻", "🎮"] },
-  { title: "Games ♡", description: "🔪 DBD\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky", emojis: ["🔪", "💥", "🍄", "🔴", "🕯️"] },
-  { title: "Identity ♡", description: "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM Open\n🔞 18+\n🧸 Under 18", emojis: ["♀️", "♂️", "🫧", "💌", "🔞", "🧸"] },
-  { title: "Server ♡", description: "🎬 Movie Night\n🤝 Partners\n🎉 Events", emojis: ["🎬", "🤝", "🎉"] }
+  { title: "Platforms ♡", description: "💻 PC\n🎮 Console" },
+  { title: "Games ♡", description: "🔪 DBD\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky" },
+  { title: "Identity ♡", description: "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM Open\n🔞 18+\n🧸 Under 18" },
+  { title: "Server ♡", description: "🎬 Movie Night\n🤝 Partners\n🎉 Events" }
 ];
 
-let roleMessageIDs = [];
-
 // =======================
-// SLASH COMMANDS
+// PERSONALITY SYSTEM
 // =======================
-const commands = [
-  new SlashCommandBuilder().setName("help").setDescription("Help menu"),
-  new SlashCommandBuilder().setName("rank").setDescription("Your rank"),
-  new SlashCommandBuilder().setName("leaderboard").setDescription("Top users"),
-  new SlashCommandBuilder().setName("daily").setDescription("Claim XP"),
-  new SlashCommandBuilder().setName("socials").setDescription("Social links"),
-  new SlashCommandBuilder().setName("schedule").setDescription("Stream schedule"),
-  new SlashCommandBuilder().setName("live").setDescription("Check stream status"),
-  new SlashCommandBuilder().setName("clip").setDescription("Post a clip link")
-].map(c => c.toJSON());
-
-const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
-
-(async () => {
-  try {
-    await rest.put(
-      Routes.applicationCommands(process.env.CLIENT_ID),
-      { body: commands }
-    );
-    console.log("Slash commands registered");
-  } catch (err) {
-    console.error(err);
-  }
-})();
-
-// =======================
-// MERGED MESSAGE HANDLER (FIX)
-// =======================
-const userMemory = new Map();
-
-const bot = {
-  name: "Hera",
-  moods: ["cute", "chaotic", "calm"],
-  mood: "cute"
-};
+const moods = ["cute", "chaotic", "calm"];
+let currentMood = "cute";
 
 setInterval(() => {
-  bot.mood = bot.moods[Math.floor(Math.random() * bot.moods.length)];
-}, 1000 * 60 * 8);
+  currentMood = moods[Math.floor(Math.random() * moods.length)];
+}, 1000 * 60 * 6);
 
-const personality = {
+const responses = {
   cute: {
-    hello: ["hi hi 💜", "heyyy :3 💜", "hello there 💜"],
-    howareyou: ["i’m gooddd 💜", "just vibing 💜"],
-    mention: ["hi hi 💜 i’m here!", "you called? 💜"],
-    default: ["hmm 👀💜", "tell me more :3"]
+    hello: ["hi hi 💜", "heyyy :3 💜"],
+    mention: ["you called? 💜"],
+    default: ["hmm 👀💜"]
   },
   chaotic: {
-    hello: ["YO 💜💥", "HELLO??? 💜"],
-    howareyou: ["I AM ALIVE 💥💜", "ENERGY MAXED"],
-    mention: ["WHAT DO YOU NEED 💜", "I HEARD MY NAME 💥"],
-    default: ["WAIT WHAT 💀💜", "EXPLAIN??"]
+    hello: ["YO 💜💥"],
+    mention: ["WHAT?? 💥"],
+    default: ["WAIT WHAT 💀💜"]
   },
   calm: {
-    hello: ["hey 💜", "hi 💜"],
-    howareyou: ["i’m alright 💜", "calm today"],
-    mention: ["yes? 💜", "i’m here"],
-    default: ["i see 💜", "interesting"]
+    hello: ["hey 💜"],
+    mention: ["yes? 💜"],
+    default: ["i see 💜"]
   }
 };
+
+const cooldown = new Map();
 
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
 
+// =======================
+// SOCIAL TRACKING
+// =======================
+const seenYouTube = new Set();
+const seenTwitch = new Set();
+const seenTikTok = new Set();
+
+// =======================
+// ALERTS
+// =======================
+function sendAlert(msg) {
+  if (!ALERT_CHANNEL_ID) return;
+  client.channels.fetch(ALERT_CHANNEL_ID)
+    .then(c => c.send(msg))
+    .catch(() => {});
+}
+
+// =======================
+// YOUTUBE
+// =======================
+async function checkYouTube() {
+  try {
+    const url = `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`;
+    const feed = await parser.parseURL(url);
+
+    const latest = feed.items[0];
+    if (!latest || seenYouTube.has(latest.id)) return;
+
+    seenYouTube.add(latest.id);
+
+    sendAlert(`📺 **New YouTube Upload!**\n${latest.title}\n${latest.link}`);
+  } catch (e) {}
+}
+
+// =======================
+// TWITCH
+// =======================
+async function checkTwitch() {
+  try {
+    const token = await axios.post(
+      `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`
+    );
+
+    const access = token.data.access_token;
+
+    const res = await axios.get(
+      `https://api.twitch.tv/helix/streams?user_login=${TWITCH_USERNAME}`,
+      {
+        headers: {
+          "Client-ID": TWITCH_CLIENT_ID,
+          Authorization: `Bearer ${access}`
+        }
+      }
+    );
+
+    const live = res.data.data.length > 0;
+
+    if (live && !seenTwitch.has("live")) {
+      seenTwitch.add("live");
+      sendAlert(`🔴 **LIVE NOW ON TWITCH!** ${TWITCH_USERNAME}`);
+    }
+
+    if (!live) seenTwitch.delete("live");
+  } catch (e) {}
+}
+
+// =======================
+// TIKTOK (BEST EFFORT)
+// =======================
+async function checkTikTok() {
+  try {
+    const res = await axios.get(`https://www.tiktok.com/@${TIKTOK_USERNAME}`);
+    const match = res.data.match(/video\/(\d+)/);
+
+    if (!match) return;
+
+    const id = match[1];
+
+    if (seenTikTok.has(id)) return;
+
+    seenTikTok.add(id);
+
+    sendAlert(`🎵 **New TikTok Posted!** https://tiktok.com/@${TIKTOK_USERNAME}`);
+  } catch (e) {}
+}
+
+// =======================
+// RUN LOOPS
+// =======================
+setInterval(checkYouTube, 60000);
+setInterval(checkTwitch, 90000);
+setInterval(checkTikTok, 120000);
+
+// =======================
+// MESSAGE SYSTEM
+// =======================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   addXP(message.author.id);
 
   const content = message.content.toLowerCase();
-  const mood = bot.mood;
 
-  // =========================
-  // PREFIX COMMANDS FIRST
-  // =========================
-  if (content.startsWith("!")) {
-
-    if (content === "!help") {
-      return message.channel.send(
-        "💜 **Commands**:\n" +
-        "!help\n!roles\n!daily\n!leaderboard\n!rank"
-      );
-    }
-
-    if (content === "!roles") {
-      let text = "🎭 **React Roles Panel**\n\n";
-
-      panels.forEach(panel => {
-        text += `**${panel.title}**\n${panel.description}\n\n`;
-      });
-
-      return message.channel.send(text);
-    }
-
-    if (content === "!hello") {
-      return message.reply(pick(personality[mood].hello));
-    }
-
-    if (content === "!rank") {
-      db.get(
-        "SELECT * FROM users WHERE user_id=?",
-        [message.author.id],
-        (err, row) => {
-          if (err) return console.error(err);
-
-          const xp = row?.xp || 0;
-          const level = row?.level || 0;
-
-          message.reply(`📊 Level: **${level}** | XP: **${xp}**`);
-        }
-      );
-
-      return;
-    }
-
-    if (content === "!daily") {
-      return claimDaily(message.author.id, (ok) =>
-        message.reply(ok ? "💜 +50 XP claimed!" : "⏳ Already claimed today!")
-      );
-    }
-
-    return; // stop here so it doesn't fall into AI chatter
+  if (content === "!roles") {
+    let text = "🎭 **React Roles Panel**\n\n";
+    panels.forEach(p => {
+      text += `**${p.title}**\n${p.description}\n\n`;
+    });
+    return message.channel.send(text);
   }
 
-  // =========================
-  // BOT MENTION
-  // =========================
+  if (content === "!hello") {
+    return message.reply(pick(responses[currentMood].hello));
+  }
+
+  const now = Date.now();
+  const last = cooldown.get(message.author.id) || 0;
+  if (now - last < 8000) return;
+  cooldown.set(message.author.id, now);
+
   if (message.mentions.has(client.user)) {
-    return message.reply(pick(personality[mood].mention));
+    return message.reply(pick(responses[currentMood].mention));
   }
 
-  // =========================
-  // NATURAL CHAT ONLY BELOW
-  // =========================
-  if (content.includes("hello")) {
-    return message.reply(pick(personality[mood].hello));
-  }
-
-  if (content.includes("how are you")) {
-    return message.reply(pick(personality[mood].howareyou));
-  }
-
-  if (Math.random() < 0.03) {
-    return message.reply(pick(personality[mood].default));
+  if (Math.random() < 0.04) {
+    return message.reply(pick(responses[currentMood].default));
   }
 });
-// =======================
-// KEEP EVERYTHING ELSE UNCHANGED
-// =======================
-// (check-ins, slash handler, ready, login remain EXACT same)
 
+// =======================
+// READY
+// =======================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
 
@@ -351,28 +352,7 @@ client.once("ready", () => {
   });
 });
 
-client.on("interactionCreate", async (i) => {
-  if (!i.isChatInputCommand()) return;
-
-  if (i.commandName === "daily") {
-    claimDaily(i.user.id, (ok) =>
-      i.reply(ok ? "💜 +50 XP claimed!" : "⏳ Already claimed today!")
-    );
-  }
-
-  if (i.commandName === "leaderboard") {
-    db.all("SELECT * FROM users ORDER BY xp DESC LIMIT 10", [], (err, rows) => {
-      if (err || !rows) {
-        console.error(err);
-        return i.reply("Error loading leaderboard.");
-      }
-
-      i.reply(
-        "🏆 **Leaderboard**\n\n" +
-        rows.map((u, i) => `#${i + 1} <@${u.user_id}> XP: ${u.xp}`).join("\n")
-      );
-    });
-  }
-});
-
+// =======================
+// LOGIN
+// =======================
 client.login(process.env.DISCORD_TOKEN);
