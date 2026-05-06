@@ -9,6 +9,8 @@ const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
+const axios = require("axios"); // ✅ FIXED: Added missing axios
+const cron = require('node-cron'); // ✅ FIXED: Moved to top for consistency
 const PORT = process.env.PORT || 10000;
 
 const { 
@@ -223,10 +225,6 @@ async function addXP(userId, guild) {
 // EVENT HANDLERS
 // =======================
 client.once("ready", () => {
-      console.log(`✅ Logged in as ${client.user.tag}`);
-  const cron = require('node-cron');
-    
-    const GENERAL_CHANNEL_ID = "1285656272774889605";
 
     // --- FEATURE: Random Messages every 12 Hours ---
     const randomGems = [
