@@ -344,41 +344,36 @@ client.on("messageCreate", async (message) => {
 
 if (content === "!roles") {
   try {
-    let text = "🎭 **React Roles Panel**\n\n";
-
-    const allReactions = [];
-
-    for (const panel of panels) {
-      text += `**${panel.title}**\n`;
-
-      for (const [emoji, role] of Object.entries(panel.roles)) {
-        text += `${emoji} → ${role}\n`;
-        allReactions.push(emoji);
-      }
-
-      text += `\n`;
-    }
-
-    const msg = await message.channel.send(text);
-
-    // 🧠 clear old saved message for this guild (prevents conflicts)
+    // clear old saved messages for this guild
     db.run(
       "DELETE FROM role_messages WHERE guild_id=?",
       [message.guild.id]
     );
 
-    // save new one
-    db.run(
-      "INSERT INTO role_messages VALUES (?, ?)",
-      [message.guild.id, msg.id]
-    );
+    for (const panel of panels) {
+      let text = `🎭 **${panel.title}**\n\n`;
+      const reactions = [];
 
-    // ✅ add reactions safely
-    for (const emoji of allReactions) {
-      try {
-        await msg.react(emoji);
-      } catch (err) {
-        console.log("❌ Failed to react:", emoji, err.message);
+      for (const [emoji, role] of Object.entries(panel.roles)) {
+        text += `${emoji} → ${role}\n`;
+        reactions.push(emoji);
+      }
+
+      const msg = await message.channel.send(text);
+
+      // save EACH panel message
+      db.run(
+        "INSERT INTO role_messages VALUES (?, ?)",
+        [message.guild.id, msg.id]
+      );
+
+      // add only this panel's reactions
+      for (const emoji of reactions) {
+        try {
+          await msg.react(emoji);
+        } catch (err) {
+          console.log("❌ Failed to react:", emoji);
+        }
       }
     }
 
