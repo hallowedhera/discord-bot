@@ -2,8 +2,17 @@ const http = require("http");
 const axios = require("axios");
 const Parser = require("rss-parser");
 
+const {
+  Client,
+  GatewayIntentBits,
+  Partials,
+  REST,
+  Routes,
+  SlashCommandBuilder
+} = require("discord.js");
+
 // =======================
-// SIMPLE KEEP-ALIVE SERVER
+// KEEP ALIVE SERVER
 // =======================
 const PORT = process.env.PORT || 10000;
 
@@ -20,18 +29,11 @@ process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
 // =======================
-// DISCORD SETUP
+// DISCORD CLIENT
 // =======================
-const {
-  Client,
-  GatewayIntentBits,
-  Partials
-} = require('discord.js');
-
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMembers,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
     GatewayIntentBits.GuildMessageReactions
@@ -40,19 +42,15 @@ const client = new Client({
 });
 
 // =======================
-// ALERT CONFIG
+// CONFIG
 // =======================
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 
-// Twitch
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
 
-// YouTube
 const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-
-// TikTok
 const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 
 const parser = new Parser();
@@ -63,17 +61,34 @@ let lastVideo = null;
 let lastTikTok = null;
 
 // =======================
-// HELPERS
+// SIMPLE MEMORY (NO DB)
 // =======================
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+const userContext = {}; // stores last message per user
 
-const personality = {
-  hello: ["hey hey 💜", "hi hi 💜", "hello 💜", "yo 💜"],
-  howareyou: ["I’m good 💜 just vibing", "doing great 💜", "pretty chill rn 💜"],
-  thanks: ["anytime 💜", "no problem 💜", "of course 💜"]
-};
+// =======================
+// SLASH COMMANDS
+// =======================
+const commands = [
+  new SlashCommandBuilder().setName("help").setDescription("Help menu"),
+  new SlashCommandBuilder().setName("socials").setDescription("Social links"),
+  new SlashCommandBuilder().setName("schedule").setDescription("Stream schedule"),
+  new SlashCommandBuilder().setName("live").setDescription("Check stream status"),
+  new SlashCommandBuilder().setName("clip").setDescription("Post a clip link")
+].map(c => c.toJSON());
+
+const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
+
+(async () => {
+  try {
+    await rest.put(
+      Routes.applicationCommands(process.env.CLIENT_ID),
+      { body: commands }
+    );
+    console.log("Slash commands registered.");
+  } catch (err) {
+    console.error(err);
+  }
+})();
 
 // =======================
 // TWITCH TOKEN
@@ -96,10 +111,10 @@ async function getTwitchToken() {
 async function checkTwitch() {
   if (!twitchToken) await getTwitchToken();
 
-  const res = await axios.get(`https://api.twitch.tv/helix/streams`, {
+  const res = await axios.get("https://api.twitch.tv/helix/streams", {
     headers: {
       "Client-ID": TWITCH_CLIENT_ID,
-      "Authorization": `Bearer ${twitchToken}`
+      Authorization: `Bearer ${twitchToken}`
     },
     params: {
       user_login: TWITCH_USERNAME
@@ -115,12 +130,13 @@ async function checkTwitch() {
     if (!isLive) {
       isLive = true;
 
+      // LIVE ALERT + @everyone
       channel.send({
         content: "@everyone",
         allowedMentions: { parse: ["everyone"] },
         embeds: [{
-          title: "🔴 Hera is LIVE on Twitch!",
-          description: `${stream.title}\n\n🎮 ${stream.game_name}\n👀 ${stream.viewer_count} viewers`,
+          title: "🔴 LIVE NOW",
+          description: `${stream.title}\n🎮 ${stream.game_name}\n👀 ${stream.viewer_count}`,
           url: `https://twitch.tv/${TWITCH_USERNAME}`,
           color: 0x9146FF,
           image: {
@@ -135,7 +151,7 @@ async function checkTwitch() {
 }
 
 // =======================
-// YOUTUBE CHECK
+// STREAM ALERTS
 // =======================
 async function checkYouTube() {
   const feed = await parser.parseURL(
@@ -144,18 +160,14 @@ async function checkYouTube() {
 
   const latest = feed.items[0];
   const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
-
   if (!channel) return;
 
   if (lastVideo !== latest.id) {
     lastVideo = latest.id;
-    channel.send(`🎥 **New YouTube Video!**\n${latest.link}`);
+    channel.send(`🎥 New YouTube Video!\n${latest.link}`);
   }
 }
 
-// =======================
-// TIKTOK CHECK
-// =======================
 async function checkTikTok() {
   const feed = await parser.parseURL(
     `https://rsshub.app/tiktok/user/${TIKTOK_USERNAME}`
@@ -163,63 +175,53 @@ async function checkTikTok() {
 
   const latest = feed.items[0];
   const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
-
   if (!channel) return;
 
   if (lastTikTok !== latest.link) {
     lastTikTok = latest.link;
-    channel.send(`🎵 **New TikTok!**\n${latest.link}`);
+    channel.send(`🎵 New TikTok!\n${latest.link}`);
   }
 }
 
 // =======================
-// ROLE MAP
+// SMART CHAT SYSTEM (IMPROVED)
 // =======================
-const reactionRoles = {
-  "💻": "PC",
-  "🎮": "Console",
-  "🔪": "DBD",
-  "💥": "Shooters",
-  "🍄": "Minecraft",
-  "🔴": "Pokemon",
-  "🕯️": "Spooky Time",
-  "♀️": "She/Her",
-  "♂️": "He/Him",
-  "🫧": "They/Them",
-  "💌": "DM'S Open",
-  "🔞": "18+",
-  "🧸": "Under 18",
-  "🎬": "Movie Night",
-  "🤝": "Partner Servers",
-  "🎉": "Server Events"
+function pick(arr) {
+  return arr[Math.floor(Math.random() * arr.length)];
+}
+
+const responses = {
+  hello: ["hey 💜", "hi hi 💜", "hello there", "yo 💜"],
+  howareyou: ["I'm good 💜", "doing fine 💜", "chilling rn 💜"],
+  default: [
+    "hmm 👀",
+    "interesting 💜",
+    "tell me more",
+    "I see 💜"
+  ]
 };
 
-// =======================
-// CHAT SYSTEM + PERSONALITY + FUN COMMANDS
-// =======================
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const content = message.content.toLowerCase();
+  const userId = message.author.id;
 
-  // mention reply
+  // ======================
+  // CONTEXT MEMORY
+  // ======================
+  userContext[userId] = content;
+
+  // ======================
+  // MENTION BOT
+  // ======================
   if (message.mentions.has(client.user)) {
     return message.reply("hey 💜 I’m here!");
   }
 
-  // help system
-  if (content === "help" || content === "!help") {
-    return message.reply(
-      "💜 **Hera Help Menu**\n\n" +
-      "• !roles → pick roles\n" +
-      "• !ping → test bot\n" +
-      "• !roll → roll a dice\n" +
-      "• !8ball → ask a question\n\n" +
-      "💬 You can also just talk to me!"
-    );
-  }
-
-  // fun commands
+  // ======================
+  // FUN COMMANDS
+  // ======================
   if (content === "!ping") return message.reply("🏓 pong!");
 
   if (content === "!roll") {
@@ -227,49 +229,69 @@ client.on("messageCreate", async (message) => {
   }
 
   if (content.startsWith("!8ball")) {
-    const answers = ["yes 💜", "no ❌", "maybe 👀", "absolutely ✨", "not sure"];
-    return message.reply(`🎱 ${pick(answers)}`);
+    const answers = ["yes 💜", "no ❌", "maybe 👀", "absolutely ✨"];
+    return message.reply(pick(answers));
   }
 
-  // personality replies
+  // ======================
+  // SMARTER CHAT (LESS REPETITIVE)
+  // ======================
   if (content.includes("hello") || content.includes("hi")) {
-    return message.reply(pick(personality.hello));
+    return message.reply(pick(responses.hello));
   }
 
   if (content.includes("how are you")) {
-    return message.reply(pick(personality.howareyou));
-  }
-
-  if (content.includes("thanks")) {
-    return message.reply(pick(personality.thanks));
+    return message.reply(pick(responses.howareyou));
   }
 
   if (content.includes("what can you do")) {
-    return message.reply("💜 I help with roles, chat, fun commands & stream alerts!");
+    return message.reply("💜 I run the server, chat, and post stream updates!");
+  }
+
+  // fallback
+  if (Math.random() < 0.08) {
+    return message.reply(pick(responses.default));
   }
 });
 
 // =======================
-// AUTO ENGAGEMENT
+// SLASH COMMANDS
 // =======================
-const engagementMessages = [
-  "💜 what are you all up to?",
-  "🎮 anyone playing anything?",
-  "💬 say hi if you're here",
-  "🔥 what games today?",
-  "👀 lurking or chatting?"
-];
+client.on("interactionCreate", async (interaction) => {
+  if (!interaction.isChatInputCommand()) return;
+
+  if (interaction.commandName === "help") {
+    return interaction.reply("💜 Help: /socials /schedule /live");
+  }
+
+  if (interaction.commandName === "socials") {
+    return interaction.reply(
+      `Twitch: https://twitch.tv/${TWITCH_USERNAME}`
+    );
+  }
+
+  if (interaction.commandName === "schedule") {
+    return interaction.reply("📅 Streams after work + weekends 💜");
+  }
+
+  if (interaction.commandName === "live") {
+    return interaction.reply(
+      isLive
+        ? "🔴 YES - live right now!"
+        : "⚫ offline right now"
+    );
+  }
+
+  if (interaction.commandName === "clip") {
+    return interaction.reply("🎬 Drop your clip link in chat!");
+  }
+});
 
 // =======================
-// READY
+// READY + AUTO EVENTS
 // =======================
-client.once('ready', () => {
+client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
-
-  client.user.setPresence({
-    status: 'online',
-    activities: [{ name: 'your server 💜' }]
-  });
 
   setInterval(checkTwitch, 60000);
   setInterval(checkYouTube, 120000);
@@ -280,7 +302,14 @@ client.once('ready', () => {
     const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
     if (!channel) return;
 
-    channel.send(pick(engagementMessages));
+    const prompts = [
+      "💜 what are you all doing?",
+      "🎮 anyone gaming?",
+      "💬 say hi if you're here",
+      "🔥 what should I stream next?"
+    ];
+
+    channel.send(pick(prompts));
   }, 1000 * 60 * 45);
 });
 
