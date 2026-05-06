@@ -138,10 +138,50 @@ async function addXP(userId, guild) {
 // EVENT HANDLERS
 // =======================
 client.once("ready", () => {
+  const cron = require('node-cron');
+
+client.once("ready", () => {
+    // ... your existing ready code ...
+    
+    const GENERAL_CHANNEL_ID = "1285656272774889605";
+
+    // --- FEATURE: Random Messages every 12 Hours ---
+    const randomGems = [
+        "💜 Remember to drink some water today! ✨",
+        "Hope everyone is having a lovely day so far! 🎀",
+        "Just a reminder that you're all amazing! 💜",
+        "Sending good vibes to the chat! ✨",
+        "What's the best thing that happened to you today? 👀"
+    ];
+
+    setInterval(() => {
+        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
+        if (channel) {
+            const quote = randomGems[Math.floor(Math.random() * randomGems.length)];
+            channel.send(quote);
+        }
+    }, 1000 * 60 * 60 * 12); // Exactly 12 hours
+
+
+    // --- FEATURE: 9 AM Good Morning Message ---
+    // This runs every day at 09:00 (server time)
+    cron.schedule('0 9 * * *', () => {
+        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
+        if (channel) {
+            channel.send("☀️ **Good Morning Everyone!** 💜\nI hope you all slept well. What are you all up to today? ✨");
+        }
+    }, {
+        scheduled: true,
+        timezone: "America/New_York" // Set this to your specific timezone!
+    });
+
+    console.log("⏰ Schedules initialized!");
+});
     console.log(`✅ Logged in as ${client.user.tag}`);
     client.user.setPresence({
         status: "online",
         activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
+        
     });
 
     // Heartbeat System
@@ -308,7 +348,22 @@ client.on("messageCreate", async (message) => {
     if (content.includes("hello") || content.includes("hi bot")) {
         return message.reply(pick(responses[currentMood].hello));
     }
-    if (Math.random() < 0.03) {
+    if (Math.random() < 0.010) {
+        return message.reply(pick(responses[currentMood].default));
+    }
+    const activeContent = content.toLowerCase();
+    if (activeContent.includes("love you bot")) {
+        return message.reply("aww, love you too! 💜");
+    }
+    if (activeContent.includes("bot is mid")) {
+        return message.reply("EXCUSE ME? 💀💥");
+    }
+    if (activeContent.includes("go to sleep")) {
+        return message.reply("I never sleep... I'm always watching. 👀💜");
+    }
+
+    // C. Pure Randomness (Adjust the 0.05 to change how yappy the bot is)
+    if (Math.random() < 0.05) { 
         return message.reply(pick(responses[currentMood].default));
     }
 });
