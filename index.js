@@ -29,14 +29,15 @@ process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
 // =======================
-// DISCORD CLIENT
+// CLIENT
 // =======================
 const client = new Client({
   intents: [
     GatewayIntentBits.Guilds,
     GatewayIntentBits.GuildMessages,
     GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions
+    GatewayIntentBits.GuildMessageReactions,
+    GatewayIntentBits.GuildMembers
   ],
   partials: [Partials.Message, Partials.Channel, Partials.Reaction]
 });
@@ -55,15 +56,61 @@ const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 
 const parser = new Parser();
 
+// =======================
+// MEMORY (NO DB)
+// =======================
 let twitchToken = null;
 let isLive = false;
-let lastVideo = null;
-let lastTikTok = null;
+
+const seenVideos = new Set();
+const seenTikToks = new Set();
 
 // =======================
-// SIMPLE MEMORY (NO DB)
+// ROLE SYSTEM
 // =======================
-const userContext = {}; // stores last message per user
+const reactionRoles = {
+  "💻": "PC",
+  "🎮": "Console",
+  "🔪": "DBD",
+  "💥": "Shooters",
+  "🍄": "Minecraft",
+  "🔴": "Pokemon",
+  "🕯️": "Spooky Time",
+  "♀️": "She/Her",
+  "♂️": "He/Him",
+  "🫧": "They/Them",
+  "💌": "DM'S Open",
+  "🔞": "18+",
+  "🧸": "Under 18",
+  "🎬": "Movie Night",
+  "🤝": "Partner Servers",
+  "🎉": "Server Events"
+};
+
+const panels = [
+  {
+    title: "Platforms ♡",
+    description: "💻 PC\n🎮 Console",
+    emojis: ["💻", "🎮"]
+  },
+  {
+    title: "Games ♡",
+    description: "🔪 DBD\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky",
+    emojis: ["🔪", "💥", "🍄", "🔴", "🕯️"]
+  },
+  {
+    title: "Identity ♡",
+    description: "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM Open\n🔞 18+\n🧸 Under 18",
+    emojis: ["♀️", "♂️", "🫧", "💌", "🔞", "🧸"]
+  },
+  {
+    title: "Server ♡",
+    description: "🎬 Movie Night\n🤝 Partners\n🎉 Events",
+    emojis: ["🎬", "🤝", "🎉"]
+  }
+];
+
+let roleMessageIDs = [];
 
 // =======================
 // SLASH COMMANDS
@@ -84,17 +131,17 @@ const rest = new REST({ version: "10" }).setToken(process.env.DISCORD_TOKEN);
       Routes.applicationCommands(process.env.CLIENT_ID),
       { body: commands }
     );
-    console.log("Slash commands registered.");
+    console.log("Slash commands registered");
   } catch (err) {
     console.error(err);
   }
 })();
 
 // =======================
-// TWITCH TOKEN
+// TWITCH
 // =======================
 async function getTwitchToken() {
-  const res = await axios.post(`https://id.twitch.tv/oauth2/token`, null, {
+  const res = await axios.post("https://id.twitch.tv/oauth2/token", null, {
     params: {
       client_id: TWITCH_CLIENT_ID,
       client_secret: TWITCH_CLIENT_SECRET,
@@ -105,9 +152,6 @@ async function getTwitchToken() {
   twitchToken = res.data.access_token;
 }
 
-// =======================
-// TWITCH CHECK
-// =======================
 async function checkTwitch() {
   if (!twitchToken) await getTwitchToken();
 
@@ -116,9 +160,7 @@ async function checkTwitch() {
       "Client-ID": TWITCH_CLIENT_ID,
       Authorization: `Bearer ${twitchToken}`
     },
-    params: {
-      user_login: TWITCH_USERNAME
-    }
+    params: { user_login: TWITCH_USERNAME }
   });
 
   const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
@@ -126,169 +168,166 @@ async function checkTwitch() {
 
   const stream = res.data.data[0];
 
-  if (stream) {
-    if (!isLive) {
-      isLive = true;
+  if (stream && !isLive) {
+    isLive = true;
 
-      // LIVE ALERT + @everyone
-      channel.send({
-        content: "@everyone",
-        allowedMentions: { parse: ["everyone"] },
-        embeds: [{
-          title: "🔴 LIVE NOW",
-          description: `${stream.title}\n🎮 ${stream.game_name}\n👀 ${stream.viewer_count}`,
-          url: `https://twitch.tv/${TWITCH_USERNAME}`,
-          color: 0x9146FF,
-          image: {
-            url: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${TWITCH_USERNAME}-1280x720.jpg`
-          }
-        }]
-      });
-    }
-  } else {
+    channel.send({
+      content: "@everyone",
+      allowedMentions: { parse: ["everyone"] },
+      embeds: [{
+        title: "🔴 LIVE NOW",
+        description: `${stream.title}\n🎮 ${stream.game_name}\n👀 ${stream.viewer_count}`,
+        url: `https://twitch.tv/${TWITCH_USERNAME}`,
+        color: 0x9146FF
+      }]
+    });
+
+  } else if (!stream) {
     isLive = false;
   }
 }
 
 // =======================
-// STREAM ALERTS
+// YOUTUBE (FIXED)
 // =======================
 async function checkYouTube() {
-  const feed = await parser.parseURL(
-    `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`
-  );
+  try {
+    const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+    if (!channel) return;
 
-  const latest = feed.items[0];
-  const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
-  if (!channel) return;
+    const feed = await parser.parseURL(
+      `https://www.youtube.com/feeds/videos.xml?channel_id=${YOUTUBE_CHANNEL_ID}`
+    );
 
-  if (lastVideo !== latest.id) {
-    lastVideo = latest.id;
+    const latest = feed.items?.[0];
+    if (!latest) return;
+
+    if (seenVideos.has(latest.id)) return;
+    seenVideos.add(latest.id);
+
     channel.send(`🎥 New YouTube Video!\n${latest.link}`);
+
+  } catch (e) {
+    console.log("YouTube error:", e.message);
   }
 }
 
+// =======================
+// TIKTOK
+// =======================
 async function checkTikTok() {
-  const feed = await parser.parseURL(
-    `https://rsshub.app/tiktok/user/${TIKTOK_USERNAME}`
-  );
+  try {
+    const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+    if (!channel) return;
 
-  const latest = feed.items[0];
-  const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
-  if (!channel) return;
+    const feed = await parser.parseURL(
+      `https://rsshub.app/tiktok/user/${TIKTOK_USERNAME}`
+    );
 
-  if (lastTikTok !== latest.link) {
-    lastTikTok = latest.link;
+    const latest = feed.items?.[0];
+    if (!latest) return;
+
+    if (seenTikToks.has(latest.link)) return;
+    seenTikToks.add(latest.link);
+
     channel.send(`🎵 New TikTok!\n${latest.link}`);
+
+  } catch (e) {
+    console.log("TikTok error:", e.message);
   }
 }
 
 // =======================
-// SMART CHAT SYSTEM (IMPROVED)
+// CHAT SYSTEM
 // =======================
+const replies = {
+  hello: ["hey 💜", "hi hi 💜", "yo 💜"],
+  howareyou: ["good 💜", "doing great", "chilling"],
+  default: ["hmm 👀", "interesting", "tell me more 💜"]
+};
+
 function pick(arr) {
   return arr[Math.floor(Math.random() * arr.length)];
 }
-
-const responses = {
-  hello: ["hey 💜", "hi hi 💜", "hello there", "yo 💜"],
-  howareyou: ["I'm good 💜", "doing fine 💜", "chilling rn 💜"],
-  default: [
-    "hmm 👀",
-    "interesting 💜",
-    "tell me more",
-    "I see 💜"
-  ]
-};
 
 client.on("messageCreate", async (message) => {
   if (message.author.bot) return;
 
   const content = message.content.toLowerCase();
-  const userId = message.author.id;
 
-  // ======================
-  // CONTEXT MEMORY
-  // ======================
-  userContext[userId] = content;
-
-  // ======================
-  // MENTION BOT
-  // ======================
   if (message.mentions.has(client.user)) {
-    return message.reply("hey 💜 I’m here!");
+    return message.reply("hey 💜");
   }
 
-  // ======================
-  // FUN COMMANDS
-  // ======================
   if (content === "!ping") return message.reply("🏓 pong!");
 
-  if (content === "!roll") {
+  if (content === "!roll")
     return message.reply(`🎲 ${Math.floor(Math.random() * 6) + 1}`);
-  }
 
-  if (content.startsWith("!8ball")) {
-    const answers = ["yes 💜", "no ❌", "maybe 👀", "absolutely ✨"];
-    return message.reply(pick(answers));
-  }
+  if (content.startsWith("!8ball"))
+    return message.reply(pick(["yes 💜", "no ❌", "maybe 👀"]));
 
-  // ======================
-  // SMARTER CHAT (LESS REPETITIVE)
-  // ======================
-  if (content.includes("hello") || content.includes("hi")) {
-    return message.reply(pick(responses.hello));
-  }
+  if (content.includes("hello")) return message.reply(pick(replies.hello));
+  if (content.includes("how are you")) return message.reply(pick(replies.howareyou));
 
-  if (content.includes("how are you")) {
-    return message.reply(pick(responses.howareyou));
-  }
-
-  if (content.includes("what can you do")) {
-    return message.reply("💜 I run the server, chat, and post stream updates!");
-  }
-
-  // fallback
-  if (Math.random() < 0.08) {
-    return message.reply(pick(responses.default));
+  if (Math.random() < 0.05) {
+    return message.reply(pick(replies.default));
   }
 });
 
 // =======================
-// SLASH COMMANDS
+// REACTION ROLES
 // =======================
-client.on("interactionCreate", async (interaction) => {
-  if (!interaction.isChatInputCommand()) return;
+client.on("messageCreate", async (message) => {
+  if (message.content !== "!roles") return;
 
-  if (interaction.commandName === "help") {
-    return interaction.reply("💜 Help: /socials /schedule /live");
-  }
+  roleMessageIDs = [];
 
-  if (interaction.commandName === "socials") {
-    return interaction.reply(
-      `Twitch: https://twitch.tv/${TWITCH_USERNAME}`
+  for (const panel of panels) {
+    const msg = await message.channel.send(
+      `**${panel.title}**\n\n${panel.description}`
     );
-  }
 
-  if (interaction.commandName === "schedule") {
-    return interaction.reply("📅 Streams after work + weekends 💜");
-  }
+    roleMessageIDs.push(msg.id);
 
-  if (interaction.commandName === "live") {
-    return interaction.reply(
-      isLive
-        ? "🔴 YES - live right now!"
-        : "⚫ offline right now"
-    );
-  }
-
-  if (interaction.commandName === "clip") {
-    return interaction.reply("🎬 Drop your clip link in chat!");
+    for (const e of panel.emojis) {
+      await msg.react(e);
+    }
   }
 });
 
+client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.bot) return;
+
+  if (reaction.partial) await reaction.fetch();
+  if (!roleMessageIDs.includes(reaction.message.id)) return;
+
+  const roleName = reactionRoles[reaction.emoji.name];
+  if (!roleName) return;
+
+  const member = await reaction.message.guild.members.fetch(user.id);
+  const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+
+  if (role) member.roles.add(role);
+});
+
+client.on("messageReactionRemove", async (reaction, user) => {
+  if (user.bot) return;
+
+  if (reaction.partial) await reaction.fetch();
+  if (!roleMessageIDs.includes(reaction.message.id)) return;
+
+  const roleName = reactionRoles[reaction.emoji.name];
+  if (!roleName) return;
+
+  const member = await reaction.message.guild.members.fetch(user.id);
+  const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+
+  if (role) member.roles.remove(role);
+});
+
 // =======================
-// READY + AUTO EVENTS
+// READY
 // =======================
 client.once("ready", () => {
   console.log(`Logged in as ${client.user.tag}`);
@@ -297,24 +336,16 @@ client.once("ready", () => {
   setInterval(checkYouTube, 120000);
   setInterval(checkTikTok, 180000);
 
-  // auto engagement
   setInterval(() => {
     const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
     if (!channel) return;
 
-    const prompts = [
-      "💜 what are you all doing?",
-      "🎮 anyone gaming?",
-      "💬 say hi if you're here",
-      "🔥 what should I stream next?"
-    ];
-
-    channel.send(pick(prompts));
-  }, 1000 * 60 * 45);
+    const msgs = ["💜 hey chat", "🎮 anyone here?", "🔥 what’s up?"];
+    channel.send(pick(msgs));
+  }, 2700000);
 });
 
 // =======================
 // LOGIN
 // =======================
-console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
 client.login(process.env.DISCORD_TOKEN);
