@@ -1,221 +1,40 @@
-
-
-const sqlite3 = require("sqlite3").verbose();
-
-const db = new sqlite3.Database("./bot.db", (err) => {
-  if (err) console.error(err);
-  else console.log("📦 SQLite connected");
-});
-
-db.serialize(() => {
-  db.run(`
-    CREATE TABLE IF NOT EXISTS role_messages (
-      guild_id TEXT,
-      message_id TEXT
-    )
-  `);
-  db.run(`
-  CREATE TABLE IF NOT EXISTS seen_social (
-    platform TEXT,
-    post_id TEXT
-  )
-`);
-  db.run(`
-    CREATE TABLE IF NOT EXISTS users (
-      user_id TEXT PRIMARY KEY,
-      xp INTEGER DEFAULT 0,
-      level INTEGER DEFAULT 0,
-      last_daily INTEGER DEFAULT 0
-    )
-  `);
-});
-
-const http = require("http");
-const axios = require("axios");
-const Parser = require("rss-parser");
-
-const {
-  Client,
-  GatewayIntentBits,
-  EmbedBuilder,
-  Partials
+const { 
+    Client, 
+    GatewayIntentBits, 
+    Partials, 
+    EmbedBuilder, 
+    ActivityType 
 } = require("discord.js");
+const sqlite3 = require("sqlite3").verbose();
+const express = require("express");
+const path = require("path");
 
 // =======================
-// KEEP ALIVE SERVER
+// CONFIG & ENV
 // =======================
+const TOKEN = process.env.DISCORD_TOKEN;
+const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
+const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID || ALERT_CHANNEL_ID;
 const PORT = process.env.PORT || 10000;
 
-http.createServer((req, res) => {
-  res.write("Bot is alive");
-  res.end();
-}).listen(PORT, () => {
-  console.log("HTTP server running on port", PORT);
+// =======================
+// DATABASE INIT
+// =======================
+const dbPath = path.resolve(__dirname, "bot.db");
+const db = new sqlite3.Database(dbPath);
+
+db.serialize(() => {
+    db.run(`CREATE TABLE IF NOT EXISTS users (
+        user_id TEXT PRIMARY KEY, 
+        xp INTEGER DEFAULT 0, 
+        level INTEGER DEFAULT 0, 
+        last_daily INTEGER DEFAULT 0
+    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS role_messages (
+        message_id TEXT PRIMARY KEY,
+        guild_id TEXT
+    )`);
 });
-
-console.log("SCRIPT STARTED");
-
-process.on("uncaughtException", console.error);
-process.on("unhandledRejection", console.error);
-
-// =======================
-// CLIENT
-// =======================
-const client = new Client({
-  intents: [
-    GatewayIntentBits.Guilds,
-    GatewayIntentBits.GuildMessages,
-    GatewayIntentBits.MessageContent,
-    GatewayIntentBits.GuildMessageReactions,
-    GatewayIntentBits.GuildMembers
-  ],
-  partials: [
-    Partials.Message,
-    Partials.Channel,
-    Partials.Reaction,
-    Partials.User,
-    Partials.GuildMember
-  ]
-});
-
-client.on("error", console.error);
-client.on("warn", console.warn);
-
-// =======================
-// CONFIG
-// =======================
-const LEVEL_CHANNEL_ID = "1395485196266111017";
-const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
-
-const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
-const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
-const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
-
-const YOUTUBE_CHANNEL_ID = process.env.YOUTUBE_CHANNEL_ID;
-const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
-
-const parser = new Parser();
-
-// =======================
-// XP SYSTEM
-// =======================
-function getLevel(xp) {
-  return Math.floor(0.1 * Math.sqrt(xp));
-}
-
-function addXP(userId) {
-  const gain = Math.floor(Math.random() * 6) + 5;
-
-  db.get("SELECT * FROM users WHERE user_id=?", [userId], (err, row) => {
-    if (err) return console.error(err);
-
-    if (!row) {
-      db.run("INSERT INTO users VALUES (?, ?, ?, ?)", [userId, gain, 0, 0]);
-      return;
-    }
-
-    const newXP = row.xp + gain;
-    const newLevel = getLevel(newXP);
-
-    db.run(
-      "UPDATE users SET xp=?, level=? WHERE user_id=?",
-      [newXP, newLevel, userId]
-    );
-
-    if (newLevel > row.level) {
-      const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
-      if (channel) {
-        channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
-      }
-    }
-  });
-}
-
-// =======================
-// DAILY XP
-// =======================
-function claimDaily(userId, cb) {
-  const now = Date.now();
-
-  db.get("SELECT * FROM users WHERE user_id=?", [userId], (err, row) => {
-    if (err) return cb(false);
-
-    if (!row) {
-      db.run("INSERT INTO users VALUES (?, ?, ?, ?)", [userId, 50, 0, now]);
-      return cb(true);
-    }
-
-    if (now - row.last_daily < 86400000) return cb(false);
-
-    db.run(
-      "UPDATE users SET xp = xp + 50, last_daily=? WHERE user_id=?",
-      [now, userId]
-    );
-
-    cb(true);
-  });
-}
-
-// =======================
-// ROLE SYSTEM
-// =======================
-const reactionRoles = {
-  "💻": "PC",
-  "🎮": "Console",
-  "🔪": "DBD",
-  "💥": "Shooters",
-  "🍄": "Minecraft",
-  "🔴": "Pokemon",
-  "🕯️": "Spooky Time",
-  "♀️": "She/Her",
-  "♂️": "He/Him",
-  "🫧": "They/Them",
-  "💌": "DM'S Open",
-  "🔞": "18+",
-  "🧸": "Under 18",
-  "🎬": "Movie Night",
-  "🤝": "Partner Servers",
-  "🎉": "Server Events"
-};
-
-const panels = [
-  {
-    title: "Platforms ♡",
-    roles: {
-      "💻": "PC",
-      "🎮": "Console"
-    }
-  },
-  {
-    title: "Games ♡",
-    roles: {
-      "🔪": "DBD",
-      "💥": "Shooters",
-      "🍄": "Minecraft",
-      "🔴": "Pokemon",
-      "🕯️": "Spooky Time"
-    }
-  },
-  {
-    title: "Identity ♡",
-    roles: {
-      "♀️": "She/Her",
-      "♂️": "He/Him",
-      "🫧": "They/Them",
-      "💌": "DM'S Open",
-      "🔞": "18+",
-      "🧸": "Under 18"
-    }
-  },
-  {
-    title: "Server ♡",
-    roles: {
-      "🎬": "Movie Night",
-      "🤝": "Partner Servers",
-      "🎉": "Server Events"
-    }
-  }
-];
 
 // =======================
 // PERSONALITY SYSTEM
@@ -223,257 +42,244 @@ const panels = [
 const moods = ["cute", "chaotic", "calm"];
 let currentMood = "cute";
 
-setInterval(() => {
-  currentMood = moods[Math.floor(Math.random() * moods.length)];
-}, 1000 * 60 * 6);
-
 const responses = {
-  cute: {
-    hello: ["hi hi 💜", "heyyy :3 💜"],
-    mention: ["you called? 💜"],
-    default: ["hmm 👀💜"]
-  },
-  chaotic: {
-    hello: ["YO 💜💥"],
-    mention: ["WHAT?? 💥"],
-    default: ["WAIT WHAT 💀💜"]
-  },
-  calm: {
-    hello: ["hey 💜"],
-    mention: ["yes? 💜"],
-    default: ["i see 💜"]
-  }
+    cute: {
+        hello: ["hi hi 💜", "heyyy :3 💜", "helloooo! ✨"],
+        mention: ["you called? 💜", "yes, bestie? ✨"],
+        default: ["hmm 👀💜", "pog! 🎀"]
+    },
+    chaotic: {
+        hello: ["YO 💜💥", "LETS GOOO 💀"],
+        mention: ["WHAT?? 💥", "STOP PINGING ME lol"],
+        default: ["WAIT WHAT 💀💜", "LMAO NO WAY"]
+    },
+    calm: {
+        hello: ["hey 💜", "hello."],
+        mention: ["yes? 💜", "i am here."],
+        default: ["i see 💜", "noted."]
+    }
 };
 
-const cooldown = new Map();
-
-function pick(arr) {
-  return arr[Math.floor(Math.random() * arr.length)];
-}
+setInterval(() => {
+    currentMood = moods[Math.floor(Math.random() * moods.length)];
+}, 1000 * 60 * 6);
 
 // =======================
-// SOCIAL TRACKING
+// ROLE CONFIG
 // =======================
-const seenYouTube = new Set();
-const seenTwitch = new Set();
-const seenTikTok = new Set();
+const reactionRolesMap = {
+    "💻": "PC", "🎮": "Console", "🔪": "DBD", "💥": "Shooters",
+    "🍄": "Minecraft", "🔴": "Pokemon", "🕯️": "Spooky Time",
+    "♀️": "She/Her", "♂️": "He/Him", "🫧": "They/Them",
+    "💌": "DM'S Open", "🔞": "18+", "🧸": "Under 18",
+    "🎬": "Movie Night", "🤝": "Partner Servers", "🎉": "Server Events"
+};
 
-// =======================
-// ALERTS
-// =======================
-function sendAlert(msg) {
-  if (!ALERT_CHANNEL_ID) return;
-  client.channels.fetch(ALERT_CHANNEL_ID)
-    .then(c => c.send(msg))
-    .catch(() => {});
-}
-
-// =======================
-// TWITCH
-// =======================
-async function checkTwitch() {
-  try {
-    const token = await axios.post(
-      `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`
-    );
-
-    const access = token.data.access_token;
-
-    const res = await axios.get(
-      `https://api.twitch.tv/helix/streams?user_login=${TWITCH_USERNAME}`,
-      {
-        headers: {
-          "Client-ID": TWITCH_CLIENT_ID,
-          Authorization: `Bearer ${access}`
-        }
-      }
-    );
-
-    const live = res.data.data.length > 0;
-
-    if (live && !seenTwitch.has("live")) {
-      seenTwitch.add("live");
-      sendAlert(`🔴 **LIVE NOW ON TWITCH!** ${TWITCH_USERNAME}`);
-    }
-
-    if (!live) seenTwitch.delete("live");
-  } catch (e) {}
-}
+const panels = [
+    { title: "Platforms ♡", roles: { "💻": "PC", "🎮": "Console" } },
+    { title: "Games ♡", roles: { "🔪": "DBD", "💥": "Shooters", "🍄": "Minecraft", "🔴": "Pokemon", "🕯️": "Spooky Time" } },
+    { title: "Identity ♡", roles: { "♀️": "She/Her", "♂️": "He/Him", "🫧": "They/Them", "💌": "DM'S Open", "🔞": "18+", "🧸": "Under 18" } },
+    { title: "Server ♡", roles: { "🎬": "Movie Night", "🤝": "Partner Servers", "🎉": "Server Events" } }
+];
 
 // =======================
-// TIKTOK (BEST EFFORT)
+// HELPERS
 // =======================
-async function checkTikTok() {
-  try {
-    const res = await axios.get(`https://www.tiktok.com/@${TIKTOK_USERNAME}`);
-    const match = res.data.match(/video\/(\d+)/);
-
-    if (!match) return;
-
-    const id = match[1];
-
-    if (seenTikTok.has(id)) return;
-
-    seenTikTok.add(id);
-
-    sendAlert(`🎵 **New TikTok Posted!** https://tiktok.com/@${TIKTOK_USERNAME}`);
-  } catch (e) {}
-}
+const getLevel = (xp) => Math.floor(0.1 * Math.sqrt(xp));
+const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // =======================
-// RUN LOOPS
+// CLIENT SETUP
 // =======================
-setInterval(checkTwitch, 90000);
-setInterval(checkTikTok, 120000);
-
-// =======================
-// MESSAGE SYSTEM
-// =======================
-client.on("messageCreate", async (message) => {
-    console.log("MESSAGE RECEIVED:", message.content);
-  if (message.author.bot) return;
-
-  addXP(message.author.id);
-
-  const content = message.content.toLowerCase();
-
-
-// =======================
-// ✅ REACTION ROLE SYSTEM
-// =======================
-
-if (content === "!roles") {
-  try {
-    let text = "🎭 **React Roles Panel**\n\n";
-    const reactions = [];
-
-    for (const panel of panels) {
-      text += `**${panel.title}**\n`;
-
-      for (const [emoji, role] of Object.entries(panel.roles)) {
-        text += `${emoji} → ${role}\n`;
-        reactions.push(emoji);
-      }
-
-      text += `\n`;
-    }
-
-    const msg = await message.channel.send(text);
-
-    db.run("DELETE FROM role_messages WHERE guild_id=?", [
-      message.guild.id
-    ]);
-
-    db.run("INSERT INTO role_messages VALUES (?, ?)", [
-      message.guild.id,
-      msg.id
-    ]);
-
-    // small delay prevents Discord reaction spam issues
-    for (const emoji of reactions) {
-      try {
-        await msg.react(emoji);
-        await new Promise(r => setTimeout(r, 400));
-      } catch {}
-    }
-
-  } catch (err) {
-    console.error(err);
-  }
-
-  return;
-}
-  if (content === "!hello") {
-    return message.reply(pick(responses[currentMood].hello));
-  }
-  if (content === "!rank") {
-  db.get(
-    "SELECT * FROM users WHERE user_id=?",
-    [message.author.id],
-    async (err, row) => {
-      if (err) return console.error(err);
-
-      const xp = row?.xp || 0;
-      const level = row?.level || 0;
-      const nextLevelXP = Math.floor(Math.pow((level + 1) / 0.1, 2));
-
-      const embed = new EmbedBuilder()
-        .setColor(0xff66cc)
-        .setTitle(`💜 ${message.author.username}'s Rank`)
-        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
-        .addFields(
-          { name: "📊 Level", value: `${level}`, inline: true },
-          { name: "✨ XP", value: `${xp}`, inline: true },
-          { name: "🎯 Next Level", value: `${nextLevelXP}`, inline: true }
-        );
-
-      message.reply({ embeds: [embed] });
-    }
-  );
-  return;
-}
-
-if (content === "!leaderboard") {
-  db.all(
-    "SELECT user_id, xp, level FROM users ORDER BY xp DESC LIMIT 10",
-    async (err, rows) => {
-      if (err) return console.error(err);
-
-      const description = await Promise.all(
-        rows.map(async (u, i) => {
-          let userTag = u.user_id;
-
-          try {
-            const user = await client.users.fetch(u.user_id);
-            userTag = user.username;
-          } catch {}
-
-          return `**${i + 1}. ${userTag}** — Level ${u.level} | XP ${u.xp}`;
-        })
-      );
-
-      const embed = new EmbedBuilder()
-        .setColor(0x00ccff)
-        .setTitle("🏆 XP Leaderboard")
-        .setDescription(description.join("\n"));
-
-      message.channel.send({ embeds: [embed] });
-    }
-  );
-  return;
-}
-
-  const now = Date.now();
-  const last = cooldown.get(message.author.id) || 0;
-  if (now - last < 8000) return;
-  cooldown.set(message.author.id, now);
-
-  if (message.mentions.has(client.user)) {
-    return message.reply(pick(responses[currentMood].mention));
-  }
-
-  if (Math.random() < 0.04) {
-    return message.reply(pick(responses[currentMood].default));
-  }
+const client = new Client({
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMembers
+    ],
+    partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
 
 // =======================
-// READY
+// KEEP-ALIVE SERVER
+// =======================
+const app = express();
+app.get("/", (req, res) => res.send("Bot is active."));
+app.listen(PORT, () => console.log(`Keep-alive server on port ${PORT}`));
+
+// =======================
+// XP LOGIC
+// =======================
+async function addXP(userId, guild) {
+    const gain = Math.floor(Math.random() * 6) + 5;
+    db.get("SELECT * FROM users WHERE user_id = ?", [userId], (err, row) => {
+        if (err) return;
+        if (!row) {
+            db.run("INSERT INTO users (user_id, xp, level) VALUES (?, ?, ?)", [userId, gain, 0]);
+        } else {
+            const newXP = row.xp + gain;
+            const newLevel = getLevel(newXP);
+            db.run("UPDATE users SET xp = ?, level = ? WHERE user_id = ?", [newXP, newLevel, userId]);
+            
+            if (newLevel > row.level) {
+                const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
+                if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
+            }
+        }
+    });
+}
+
+// =======================
+// EVENT HANDLERS
 // =======================
 client.once("ready", () => {
-  console.log(`Logged in as ${client.user.tag}`);
+    console.log(`✅ Logged in as ${client.user.tag}`);
+    client.user.setPresence({
+        status: "online",
+        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
+    });
 
-  client.user.setPresence({
-    status: "online",
-    activities: [{ name: "💜 Always On ✨", type: 0 }]
-  });
+    // Heartbeat System
+    let lastHeartbeat = 0;
+    setInterval(() => {
+        const now = Date.now();
+        if (now - lastHeartbeat < 1700000) return; 
+        const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
+        if (channel) {
+            channel.send("💜 I’m still online!").catch(() => {});
+            lastHeartbeat = now;
+        }
+    }, 1000 * 60 * 30);
 });
-if (ALERT_CHANNEL_ID) {
-  setInterval(() => {
-    sendAlert("💜 just checking in... I'm still here!");
-  }, 1000 * 60 * 30);
+
+client.on("messageCreate", async (message) => {
+    if (message.author.bot || !message.guild) return;
+
+    addXP(message.author.id, message.guild);
+    const content = message.content.toLowerCase();
+
+    // Updated !roles command for Individual Panels
+    if (content === "!roles" && message.member.permissions.has("Administrator")) {
+        for (const panel of panels) {
+            let text = `**${panel.title}**\n`;
+            const emojisToReact = [];
+            
+            Object.entries(panel.roles).forEach(([emoji, name]) => {
+                text += `${emoji} → ${name}\n`;
+                emojisToReact.push(emoji);
+            });
+
+            const sentMsg = await message.channel.send(text);
+            
+            // Save each individual message ID to the database
+            db.run("INSERT OR REPLACE INTO role_messages (message_id, guild_id) VALUES (?, ?)", [sentMsg.id, message.guild.id]);
+
+            // React with only the emojis for this specific category
+            for (const emoji of emojisToReact) {
+                await sentMsg.react(emoji).catch(() => {});
+                await new Promise(r => setTimeout(r, 450)); // Prevent Discord rate limit
+            }
+        }
+        return;
+    }
+
+    if (content === "!rank") {
+        db.get("SELECT * FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
+            const xp = row?.xp || 0;
+            const level = row?.level || 0;
+            const nextXP = Math.floor(Math.pow((level + 1) / 0.1, 2));
+            
+            const embed = new EmbedBuilder()
+                .setColor(0xff66cc)
+                .setTitle(`💜 ${message.author.username}'s Rank`)
+                .setThumbnail(message.author.displayAvatarURL())
+                .addFields(
+                    { name: "📊 Level", value: `${level}`, inline: true },
+                    { name: "✨ XP", value: `${xp}`, inline: true },
+                    { name: "🎯 Next Level", value: `${nextXP} XP`, inline: true }
+                );
+            message.reply({ embeds: [embed] });
+        });
+        return;
+    }
+
+    if (content === "!daily") {
+        const now = Date.now();
+        db.get("SELECT last_daily FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
+            if (row && now - row.last_daily < 86400000) {
+                const remaining = Math.ceil((86400000 - (now - row.last_daily)) / 3600000);
+                return message.reply(`Slow down! Try again in ${remaining} hours. 💜`);
+            }
+            db.run("UPDATE users SET xp = xp + 50, last_daily = ? WHERE user_id = ?", [now, message.author.id]);
+            message.reply("✨ You claimed your daily **50 XP**! 💜");
+        });
+        return;
+    }
+
+    if (content === "!leaderboard") {
+        db.all("SELECT user_id, xp, level FROM users ORDER BY xp DESC LIMIT 10", async (err, rows) => {
+            if (err || !rows) return;
+            const list = await Promise.all(rows.map(async (r, i) => {
+                const u = await client.users.fetch(r.user_id).catch(() => ({ username: "Unknown" }));
+                return `**${i + 1}.** ${u.username} • Lvl ${r.level} (${r.xp} XP)`;
+            }));
+            const embed = new EmbedBuilder()
+                .setColor(0x00ccff)
+                .setTitle("🏆 XP Leaderboard")
+                .setDescription(list.join("\n") || "No one yet!");
+            message.channel.send({ embeds: [embed] });
+        });
+        return;
+    }
+
+    // Personality triggers
+    if (message.mentions.has(client.user)) {
+        return message.reply(pick(responses[currentMood].mention));
+    }
+    if (content.includes("hello") || content.includes("hi bot")) {
+        return message.reply(pick(responses[currentMood].hello));
+    }
+    if (Math.random() < 0.03) {
+        return message.reply(pick(responses[currentMood].default));
+    }
+});
+
+// =======================
+// REACTION LOGIC
+// =======================
+async function toggleRole(reaction, user, add = true) {
+    if (user.bot || !reaction.message.guild) return;
+    if (reaction.partial) await reaction.fetch().catch(() => {});
+
+    // Check if the message is in our role_messages database
+    db.get("SELECT * FROM role_messages WHERE message_id = ?", [reaction.message.id], async (err, row) => {
+        if (!row) return;
+
+        const roleName = reactionRolesMap[reaction.emoji.name];
+        if (!roleName) return;
+
+        const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+        const member = await reaction.message.guild.members.fetch(user.id).catch(() => {});
+
+        if (role && member) {
+            if (add) {
+                await member.roles.add(role).catch(e => console.error(`Add role error: ${e}`));
+            } else {
+                await member.roles.remove(role).catch(e => console.error(`Remove role error: ${e}`));
+            }
+        }
+    });
 }
+
+client.on("messageReactionAdd", (r, u) => toggleRole(r, u, true));
+client.on("messageReactionRemove", (r, u) => toggleRole(r, u, false));
+
 // =======================
-// LOGIN
+// ERROR HANDLING
 // =======================
-client.login(process.env.DISCORD_TOKEN);
+process.on("unhandledRejection", console.error);
+process.on("uncaughtException", console.error);
+
+client.login(DISCORD_TOKEN);
