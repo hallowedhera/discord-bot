@@ -211,3 +211,11 @@ client.login(process.env.DISCORD_TOKEN);
 client.on('messageCreate', message => {
   console.log("message seen:", message.content);
 });
+
+client.once('ready', () => {
+  console.log(`Logged in as ${client.user.tag}`);
+  client.user.setPresence({
+    status: 'online',
+    activities: [{ name: 'your server 💜' }]
+  });
+});
