@@ -15,22 +15,18 @@ const axios = require("axios"); // ✅ FIXED: Added missing axios
 const cron = require('node-cron'); // ✅ FIXED: Moved to top for consistency
 const PORT = process.env.PORT || 10000;
 
-const { 
-    Client, 
-    GatewayIntentBits, 
-    Partials, 
-    EmbedBuilder, 
-    ActivityType 
-} = require("discord.js");
-const sqlite3 = require("sqlite3").verbose();
-const path = require("path");
+// 1. Define everything first
 const express = require("express");
-// =======================
-// KEEP-ALIVE SERVER
-// =======================
+const path = require("path");
+const PORT = process.env.PORT || 10000; // Move this up!
+
+// 2. Start the Keep-Alive server
 const app = express();
 app.get("/", (req, res) => res.send("Bot is active."));
 app.listen(PORT, () => console.log(`Keep-alive server on port ${PORT}`));
+
+// 3. Then initialize the Bot
+const { Client, GatewayIntentBits, Partials, EmbedBuilder, ActivityType } = require("discord.js");
 
 // =======================
 // DATABASE INIT
