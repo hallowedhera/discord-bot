@@ -1,33 +1,24 @@
-
 const http = require("http");
 
+// =======================
+// SIMPLE KEEP-ALIVE SERVER (ONLY ONE)
+// =======================
+const PORT = process.env.PORT || 10000;
+
 http.createServer((req, res) => {
-  res.write("OK");
+  res.write("Bot is alive");
   res.end();
-}).listen(process.env.PORT, () => {
-  console.log("HTTP server running on port", process.env.PORT);
+}).listen(PORT, () => {
+  console.log("HTTP server running on port", PORT);
 });
 
 console.log("SCRIPT STARTED");
 process.on("uncaughtException", console.error);
 process.on("unhandledRejection", console.error);
 
-
-
-const server = http.createServer((req, res) => {
-  res.write("OK");
-  res.end();
-});
-
-server.listen(process.env.PORT, () => {
-  console.log("PORT OPEN:", process.env.PORT);
-});
-
-http.createServer((req, res) => {
-  res.write("Bot is alive");
-  res.end();
-}).listen(process.env.PORT);
-
+// =======================
+// DISCORD SETUP
+// =======================
 const {
   Client,
   GatewayIntentBits,
@@ -72,14 +63,12 @@ const reactionRoles = {
 };
 
 // =======================
-// PANELS (UPDATED STRUCTURE)
+// PANELS
 // =======================
 const panels = [
   {
     title: "Platforms ♡",
-    description:
-      "💻 PC\n" +
-      "🎮 Console",
+    description: "💻 PC\n🎮 Console",
     emojis: ["💻", "🎮"]
   },
   {
@@ -113,7 +102,13 @@ const panels = [
   }
 ];
 
-client.once('ready', () => {
+// store role message IDs
+let roleMessageIDs = [];
+
+// =======================
+// READY
+// =======================
+client.once('clientReady', () => {
   console.log(`Logged in as ${client.user.tag}`);
 });
 
@@ -122,6 +117,8 @@ client.once('ready', () => {
 // =======================
 client.on('messageCreate', async (message) => {
   if (message.content !== '!roles') return;
+
+  roleMessageIDs = []; // reset
 
   await message.channel.send(
     "**Hera's Hollow Role Menu**\n" +
@@ -133,6 +130,8 @@ client.on('messageCreate', async (message) => {
     const msg = await message.channel.send(
       `**${panel.title}**\n\n${panel.description}`
     );
+
+    roleMessageIDs.push(msg.id);
 
     for (const emoji of panel.emojis) {
       await msg.react(emoji);
@@ -149,13 +148,18 @@ client.on('messageReactionAdd', async (reaction, user) => {
   if (reaction.partial) await reaction.fetch();
   if (reaction.message.partial) await reaction.message.fetch();
 
+  if (!reaction.message.guild) return;
+
+  // only allow role panel messages
+  if (!roleMessageIDs.includes(reaction.message.id)) return;
+
   const roleName = reactionRoles[reaction.emoji.name];
   if (!roleName) return;
 
   const guild = reaction.message.guild;
   const member = await guild.members.fetch(user.id);
-
   const role = guild.roles.cache.find(r => r.name === roleName);
+
   if (!role) return;
 
   // AGE LOCK
@@ -181,29 +185,29 @@ client.on('messageReactionRemove', async (reaction, user) => {
   if (reaction.partial) await reaction.fetch();
   if (reaction.message.partial) await reaction.message.fetch();
 
+  if (!reaction.message.guild) return;
+  if (!roleMessageIDs.includes(reaction.message.id)) return;
+
   const roleName = reactionRoles[reaction.emoji.name];
   if (!roleName) return;
 
   const guild = reaction.message.guild;
   const member = await guild.members.fetch(user.id);
-
   const role = guild.roles.cache.find(r => r.name === roleName);
+
   if (!role) return;
 
   await member.roles.remove(role);
 });
 
-
 // =======================
 // LOGIN
 // =======================
 console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
-console.log("TOKEN EXISTS:", !!process.env.DISCORD_TOKEN);
-console.log("TOKEN LENGTH:", process.env.DISCORD_TOKEN?.length);
-console.log("TOKEN START:", process.env.DISCORD_TOKEN?.slice(0, 10));
 
 client.login(process.env.DISCORD_TOKEN);
 
+// debug
 client.on('messageCreate', message => {
   console.log("message seen:", message.content);
 });
