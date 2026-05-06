@@ -14,7 +14,12 @@ db.serialize(() => {
       message_id TEXT
     )
   `);
-
+  db.run(`
+  CREATE TABLE IF NOT EXISTS seen_social (
+    platform TEXT,
+    post_id TEXT
+  )
+`);
   db.run(`
     CREATE TABLE IF NOT EXISTS users (
       user_id TEXT PRIMARY KEY,
@@ -240,12 +245,32 @@ async function checkYouTube() {
     const feed = await parser.parseURL(url);
 
     const latest = feed.items[0];
-    if (!latest || seenYouTube.has(latest.id)) return;
+    if (!latest) return;
 
-    seenYouTube.add(latest.id);
+    const videoId = latest.id || latest.link;
 
-    sendAlert(`📺 **New YouTube Upload!**\n${latest.title}\n${latest.link}`);
-  } catch (e) {}
+    // check DB instead of memory
+    db.get(
+      "SELECT post_id FROM seen_social WHERE platform=? AND post_id=?",
+      ["youtube", videoId],
+      (err, row) => {
+        if (err) return console.error(err);
+        if (row) return; // already sent
+
+        // insert new record
+        db.run(
+          "INSERT INTO seen_social VALUES (?, ?)",
+          ["youtube", videoId]
+        );
+
+        sendAlert(
+          `📺 **New YouTube Upload!**\n${latest.title}\n${latest.link}`
+        );
+      }
+    );
+  } catch (e) {
+    console.log("YouTube error:", e.message);
+  }
 }
 
 // =======================
