@@ -330,11 +330,13 @@ setInterval(checkTikTok, 120000);
 // MESSAGE SYSTEM
 // =======================
 client.on("messageCreate", async (message) => {
+    console.log("MESSAGE RECEIVED:", message.content);
   if (message.author.bot) return;
 
   addXP(message.author.id);
 
   const content = message.content.toLowerCase();
+
 
 // =======================
 // ✅ REACTION ROLE SYSTEM
@@ -480,4 +482,3 @@ if (ALERT_CHANNEL_ID) {
 // LOGIN
 // =======================
 client.login(process.env.DISCORD_TOKEN);
-console.log("MESSAGE RECEIVED:", message.content);
