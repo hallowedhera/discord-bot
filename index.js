@@ -279,7 +279,10 @@ async function checkYouTube() {
     const latest = feed.items[0];
     if (!latest) return;
 
-    const videoId = latest.id || latest.link;
+    const videoId =
+  latest.id?.split(":").pop() ||
+  latest.link;
+  if (!videoId || videoId.includes("w.youtube.com")) return;
 
     // check DB instead of memory
     db.get(
