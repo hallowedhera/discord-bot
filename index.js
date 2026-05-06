@@ -1,3 +1,5 @@
+
+
 const sqlite3 = require("sqlite3").verbose();
 
 const db = new sqlite3.Database("./bot.db", (err) => {
@@ -30,6 +32,7 @@ const Parser = require("rss-parser");
 const {
   Client,
   GatewayIntentBits,
+  EmbedBuilder,
   Partials
 } = require("discord.js");
 
@@ -325,6 +328,61 @@ client.on("messageCreate", async (message) => {
   if (content === "!hello") {
     return message.reply(pick(responses[currentMood].hello));
   }
+  if (content === "!rank") {
+  db.get(
+    "SELECT * FROM users WHERE user_id=?",
+    [message.author.id],
+    async (err, row) => {
+      if (err) return console.error(err);
+
+      const xp = row?.xp || 0;
+      const level = row?.level || 0;
+      const nextLevelXP = Math.floor(Math.pow((level + 1) / 0.1, 2));
+
+      const embed = new EmbedBuilder()
+        .setColor(0xff66cc)
+        .setTitle(`💜 ${message.author.username}'s Rank`)
+        .setThumbnail(message.author.displayAvatarURL({ dynamic: true }))
+        .addFields(
+          { name: "📊 Level", value: `${level}`, inline: true },
+          { name: "✨ XP", value: `${xp}`, inline: true },
+          { name: "🎯 Next Level", value: `${nextLevelXP}`, inline: true }
+        )
+        .setFooter({ text: "keep chatting to level up 💜" });
+
+      message.reply({ embeds: [embed] });
+      if (content === "!leaderboard") {
+  db.all(
+    "SELECT user_id, xp, level FROM users ORDER BY xp DESC LIMIT 10",
+    async (err, rows) => {
+      if (err) return console.error(err);
+
+      const description = await Promise.all(
+        rows.map(async (u, i) => {
+          let userTag = u.user_id;
+
+          try {
+            const user = await client.users.fetch(u.user_id);
+            userTag = user.username;
+          } catch {}
+
+          return `**${i + 1}. ${userTag}** — Level ${u.level} | XP ${u.xp}`;
+        })
+      );
+
+      const embed = new EmbedBuilder()
+        .setColor(0x00ccff)
+        .setTitle("🏆 XP Leaderboard")
+        .setDescription(description.join("\n"))
+        .setFooter({ text: "rankings based on activity 💜" });
+
+      message.channel.send({ embeds: [embed] });
+    }
+  );
+}
+    }
+  );
+}
 
   const now = Date.now();
   const last = cooldown.get(message.author.id) || 0;
