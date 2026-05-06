@@ -374,42 +374,69 @@ client.on("messageCreate", async (message) => {
 
   const content = message.content.toLowerCase();
 
-if (content === "!roles") {
-  let text = "🎭 **React Roles Panel**\n\n";
+// =======================
+// ✅ REACTION ROLE SYSTEM
+// =======================
 
-  const allReactions = [];
+// ADD ROLE
+client.on("messageReactionAdd", async (reaction, user) => {
+  if (user.bot) return;
 
-  for (const panel of panels) {
-    text += `**${panel.title}**\n`;
+  if (reaction.partial) await reaction.fetch();
+  if (reaction.message.partial) await reaction.message.fetch();
 
-    for (const [emoji, role] of Object.entries(panel.roles)) {
-      text += `${emoji} → ${role}\n`;
-      allReactions.push(emoji);
+  db.get(
+    "SELECT message_id FROM role_messages WHERE guild_id=?",
+    [reaction.message.guild.id],
+    async (err, row) => {
+      if (err || !row) return;
+
+      if (reaction.message.id !== row.message_id) return;
+
+      const panel = panels.find(p =>
+        Object.keys(p.roles).includes(reaction.emoji.name)
+      );
+      if (!panel) return;
+
+      const roleName = panel.roles[reaction.emoji.name];
+      const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+      if (!role) return;
+
+      const member = await reaction.message.guild.members.fetch(user.id);
+      member.roles.add(role).catch(console.error);
     }
-
-    text += `\n`;
-  }
-
-  const msg = await message.channel.send(text);
-
-  db.run(
-    "INSERT INTO role_messages VALUES (?, ?)",
-    [message.guild.id, msg.id]
   );
+});
 
-  // add reactions
-  for (const emoji of allReactions) {
-    try {
-      await msg.react(emoji);
-    } catch (e) {
-      console.log("Failed reaction:", emoji);
+// REMOVE ROLE
+client.on("messageReactionRemove", async (reaction, user) => {
+  if (user.bot) return;
+
+  if (reaction.partial) await reaction.fetch();
+  if (reaction.message.partial) await reaction.message.fetch();
+
+  db.get(
+    "SELECT message_id FROM role_messages WHERE guild_id=?",
+    [reaction.message.guild.id],
+    async (err, row) => {
+      if (err || !row) return;
+
+      if (reaction.message.id !== row.message_id) return;
+
+      const panel = panels.find(p =>
+        Object.keys(p.roles).includes(reaction.emoji.name)
+      );
+      if (!panel) return;
+
+      const roleName = panel.roles[reaction.emoji.name];
+      const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
+      if (!role) return;
+
+      const member = await reaction.message.guild.members.fetch(user.id);
+      member.roles.remove(role).catch(console.error);
     }
-  }
-
-  return;
-}
-  return;
-}
+  );
+});
   if (content === "!hello") {
     return message.reply(pick(responses[currentMood].hello));
   }
