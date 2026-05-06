@@ -95,16 +95,23 @@ async function checkTwitch() {
   const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
   if (!channel) return;
 
-  if (res.data.data.length > 0) {
+  const stream = res.data.data[0];
+
+  if (stream) {
     if (!isLive) {
       isLive = true;
 
       channel.send({
+        content: "@everyone",
+        allowedMentions: { parse: ["everyone"] },
         embeds: [{
-          title: "🔴 Hera is LIVE!",
-          description: "Come hang out 💜",
+          title: "🔴 Hera is LIVE on Twitch!",
+          description: `${stream.title}\n\n🎮 ${stream.game_name}\n👀 ${stream.viewer_count} viewers`,
           url: `https://twitch.tv/${TWITCH_USERNAME}`,
-          color: 0x9146FF
+          color: 0x9146FF,
+          image: {
+            url: `https://static-cdn.jtvnw.net/previews-ttv/live_user_${TWITCH_USERNAME}-1280x720.jpg`
+          }
         }]
       });
     }
@@ -134,7 +141,7 @@ async function checkYouTube() {
 }
 
 // =======================
-// TIKTOK CHECK (RSS)
+// TIKTOK CHECK
 // =======================
 async function checkTikTok() {
   const feed = await parser.parseURL(
@@ -176,7 +183,30 @@ const reactionRoles = {
 };
 
 // =======================
-// PANELS
+// BOT CHAT RESPONSES (NEW)
+// =======================
+client.on("messageCreate", async (message) => {
+  if (message.author.bot) return;
+
+  const content = message.content.toLowerCase();
+
+  // If someone mentions the bot
+  if (message.mentions.has(client.user)) {
+    return message.reply("hey 💜 how can I help?");
+  }
+
+  // Simple commands
+  if (content === "!ping") {
+    return message.reply("🏓 pong!");
+  }
+
+  if (content === "!hello") {
+    return message.reply("hi hi 💜");
+  }
+});
+
+// =======================
+// PANELS (UNCHANGED)
 // =======================
 const panels = [
   {
@@ -187,30 +217,19 @@ const panels = [
   {
     title: "Games ♡",
     description:
-      "🔪 Dead by Daylight\n" +
-      "💥 Shooters\n" +
-      "🍄 Minecraft\n" +
-      "🔴 Pokemon\n" +
-      "🕯️ Spooky Time",
+      "🔪 Dead by Daylight\n💥 Shooters\n🍄 Minecraft\n🔴 Pokemon\n🕯️ Spooky Time",
     emojis: ["🔪", "💥", "🍄", "🔴", "🕯️"]
   },
   {
     title: "Identity & Age ♡",
     description:
-      "♀️ She/Her\n" +
-      "♂️ He/Him\n" +
-      "🫧 They/Them\n" +
-      "💌 DM's Open\n\n" +
-      "🔞 18+\n" +
-      "🧸 Under 18",
+      "♀️ She/Her\n♂️ He/Him\n🫧 They/Them\n💌 DM's Open\n\n🔞 18+\n🧸 Under 18",
     emojis: ["♀️", "♂️", "🫧", "💌", "🔞", "🧸"]
   },
   {
     title: "Server ♡",
     description:
-      "🎬 Movie Night\n" +
-      "🤝 Partner Servers\n" +
-      "🎉 Server Events",
+      "🎬 Movie Night\n🤝 Partner Servers\n🎉 Server Events",
     emojis: ["🎬", "🤝", "🎉"]
   }
 ];
@@ -228,7 +247,6 @@ client.once('ready', () => {
     activities: [{ name: 'your server 💜' }]
   });
 
-  // Start loops AFTER bot is ready
   setInterval(checkTwitch, 60000);
   setInterval(checkYouTube, 120000);
   setInterval(checkTikTok, 180000);
@@ -242,11 +260,7 @@ client.on('messageCreate', async (message) => {
 
   roleMessageIDs = [];
 
-  await message.channel.send(
-    "**Hera's Hollow Role Menu**\n" +
-    "React to the panels below to select your roles.\n" +
-    "You can change them at any time."
-  );
+  await message.channel.send("**Hera's Hollow Role Menu 💜**");
 
   for (const panel of panels) {
     const msg = await message.channel.send(
@@ -262,7 +276,7 @@ client.on('messageCreate', async (message) => {
 });
 
 // =======================
-// ADD ROLE
+// ROLE ADD
 // =======================
 client.on('messageReactionAdd', async (reaction, user) => {
   if (user.bot) return;
@@ -282,21 +296,11 @@ client.on('messageReactionAdd', async (reaction, user) => {
 
   if (!role) return;
 
-  if (roleName === "18+") {
-    const under18 = guild.roles.cache.find(r => r.name === "Under 18");
-    if (under18) await member.roles.remove(under18);
-  }
-
-  if (roleName === "Under 18") {
-    const adult = guild.roles.cache.find(r => r.name === "18+");
-    if (adult) await member.roles.remove(adult);
-  }
-
   await member.roles.add(role);
 });
 
 // =======================
-// REMOVE ROLE
+// ROLE REMOVE
 // =======================
 client.on('messageReactionRemove', async (reaction, user) => {
   if (user.bot) return;
