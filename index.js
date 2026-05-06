@@ -348,5 +348,6 @@ client.on("messageReactionRemove", (r, u) => toggleRole(r, u, false));
 // =======================
 process.on("unhandledRejection", console.error);
 process.on("uncaughtException", console.error);
+console.log("START");
 
-client.login(DISCORD_TOKEN);
+client.login(process.env.DISCORD_TOKEN);
