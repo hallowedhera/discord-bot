@@ -225,6 +225,11 @@ async function addXP(userId, guild) {
 // EVENT HANDLERS
 // =======================
 client.once("ready", () => {
+  client.user.setPresence({
+        status: "online",
+        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
+        
+    });
 
     // --- FEATURE: Random Messages every 12 Hours ---
     const randomGems = [
@@ -258,12 +263,7 @@ client.once("ready", () => {
 
     console.log("⏰ Schedules initialized!");
 });
-    client.user.setPresence({
-        status: "online",
-        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
-        
-    });
-
+    
     // Heartbeat System
     let lastHeartbeat = 0;
     setInterval(() => {
