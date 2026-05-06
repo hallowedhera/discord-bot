@@ -345,14 +345,14 @@ client.on("messageCreate", async (message) => {
 if (content === "!roles") {
   try {
     let text = "🎭 **React Roles Panel**\n\n";
-    const reactions = new Set();
+    const reactions = [];
 
     for (const panel of panels) {
       text += `**${panel.title}**\n`;
 
       for (const [emoji, role] of Object.entries(panel.roles)) {
         text += `${emoji} → ${role}\n`;
-        reactions.add(emoji);
+        reactions.push(emoji);
       }
 
       text += `\n`;
@@ -369,9 +369,11 @@ if (content === "!roles") {
       msg.id
     ]);
 
+    // small delay prevents Discord reaction spam issues
     for (const emoji of reactions) {
       try {
         await msg.react(emoji);
+        await new Promise(r => setTimeout(r, 400));
       } catch {}
     }
 
