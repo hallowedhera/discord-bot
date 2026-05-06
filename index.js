@@ -461,7 +461,36 @@ client.on("messageCreate", async (message) => {
     }
 
     // --- END ECONOMY LOGIC ---
+// --- FEATURE: Ping Pong Game ---
+    if (content === "!pingpong") {
+        let score = 0;
+        await message.channel.send("🏓 **Game on!** I'll start...\n**PING!**");
 
+        // The filter ensures Hera only listens to the person who started the game
+        const filter = m => m.author.id === message.author.id && 
+                           (m.content.toLowerCase() === "pong" || m.content.toLowerCase() === "ping");
+        
+        // Collector lasts for 10 seconds per turn
+        const collector = message.channel.createMessageCollector({ filter, time: 10000 });
+
+        collector.on('collect', async m => {
+            score++;
+            // If you say ping, she says pong. If you say pong, she says ping.
+            const response = m.content.toLowerCase() === "ping" ? "**PONG!**" : "**PING!**";
+            
+            await m.channel.send(`${response} (Score: ${score})`);
+            
+            // Reset the 10-second timer so you have time for the next hit
+            collector.resetTimer(); 
+        });
+
+        collector.on('end', (collected, reason) => {
+            if (reason === 'time') {
+                message.channel.send(`⏱️ **Time's up!** You missed the ball. Final Score: **${score}** 💜`);
+            }
+        });
+        return;
+    }
     // Personality triggers
     if (message.mentions.has(client.user)) {
         return message.reply(pick(responses[currentMood].mention));
