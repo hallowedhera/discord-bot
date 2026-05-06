@@ -230,6 +230,18 @@ client.once("ready", () => {
         activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
         
     });
+    // Heartbeat System
+    let lastHeartbeat = 0;
+    setInterval(() => {
+        const now = Date.now();
+        if (now - lastHeartbeat < 1700000) return; 
+        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
+        if (channel) {
+            channel.send("💜 I’m still online!").catch(() => {});
+            lastHeartbeat = now;
+        }
+    }, 1000 * 60 * 30);
+
 
     // --- FEATURE: Random Messages every 12 Hours ---
     const randomGems = [
@@ -264,69 +276,36 @@ client.once("ready", () => {
     console.log("⏰ Schedules initialized!");
 });
     
-    // Heartbeat System
-    let lastHeartbeat = 0;
-    setInterval(() => {
-        const now = Date.now();
-        if (now - lastHeartbeat < 1700000) return; 
-        const channel = client.channels.cache.get(ALERT_CHANNEL_ID);
-        if (channel) {
-            channel.send("💜 I’m still online!").catch(() => {});
-            lastHeartbeat = now;
-        }
-    }, 1000 * 60 * 30);
-
+    
 client.on("messageCreate", async (message) => {
     const args = message.content.split(" ");
     if (message.author.bot || !message.guild) return;
 
     addXP(message.author.id, message.guild);
     const content = message.content.toLowerCase();
-    if (content === "!help") {
-  const embed = new EmbedBuilder()
-    .setColor(0xff66cc)
-    .setTitle("💜 Hera Bot Commands")
-    .setDescription("Everything I can do ✨")
-    .addFields(
-      {
-        name: "🎭 Reaction Roles",
-        value: "`!roles` → shows role categories you can react to"
-      },
-      {
-        name: "📊 Leveling System",
-        value:
-          "`!rank` → your XP + level\n`!leaderboard` → top users on the server"
-      },
-      {
-        name: "💰 Economy",
-        value:
-          "`!daily` → claim daily XP reward (if enabled)\nXP is gained automatically from chatting"
-      },
-      {
-        name: "💬 Fun Commands",
-        value:
-          "`!hello` → talk to the bot\nMention me → random replies"
-      },
-      {
-        name: "🔴 Live Alerts (Auto)",
-        value:
-          "• Twitch live notifications\n• TikTok new post alerts\n• Sent to #hera-alerts"
-      },
-      {
-        name: "⚙️ System",
-        value:
-          "Auto XP tracking\nReaction role system\nAlways-online alert system"
-      },
-       {
-        name: "Ping Pong!",
-        value:
-          "!pingpong → play a fun game of ping pong with the bot! 🏓"
-      }
-    )
-    .setFooter({ text: "💜 built for activity + community engagement" });
+// Always run XP tracking first
+    addXP(message.author.id, message.guild);
 
-  return message.channel.send({ embeds: [embed] });
-}
+    // =======================
+    // HELP COMMAND
+    // =======================
+    if (content === "!help") {
+        const embed = new EmbedBuilder()
+            .setColor(0xff66cc)
+            .setTitle("💜 Hera Bot Commands")
+            .setDescription("Everything I can do ✨")
+            .addFields(
+                { name: "🎭 Reaction Roles", value: "`!roles`" },
+                { name: "📊 Leveling System", value: "`!rank` | `!leaderboard`" },
+                { name: "💰 Economy", value: "`!daily` | `!bal` | `!work`" },
+                { name: "💬 Fun Commands", value: "`!hello` | Mention me" },
+                { name: "🏓 Ping Pong!", value: "`!pingpong`" }
+            )
+            .setFooter({ text: "💜 built for activity + community engagement" });
+
+        return message.channel.send({ embeds: [embed] });
+    } // <--- HELP ENDS HERE
+
 
     // Updated !roles command for Individual Panels
     if (content === "!roles" && message.member.permissions.has("Administrator")) {
