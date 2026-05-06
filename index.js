@@ -202,18 +202,6 @@ const getLevel = (xp) => Math.floor(0.1 * Math.sqrt(xp));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // =======================
-// CLIENT SETUP
-// =======================
-const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMembers
-    ],
-    partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
-});
 
 // =======================
 // XP LOGIC
