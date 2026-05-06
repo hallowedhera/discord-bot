@@ -20,14 +20,6 @@ const path = require("path");
 const sqlite3 = require("sqlite3").verbose();
 const axios = require("axios");
 const cron = require('node-cron');
-const { 
-    Client, 
-    GatewayIntentBits, 
-    Partials, 
-    EmbedBuilder, 
-    ActivityType 
-} = require("discord.js");
-
 // =======================
 // 2. CONFIG & PORT
 // =======================
