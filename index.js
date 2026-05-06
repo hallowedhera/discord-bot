@@ -22,18 +22,16 @@ const PORT = process.env.PORT || 10000;
 // =======================
 const dbPath = path.resolve(__dirname, "bot.db");
 const db = new sqlite3.Database(dbPath);
-
-db.serialize(() => {
+ db.serialize(() => {
+    // Added 'balance' column here
     db.run(`CREATE TABLE IF NOT EXISTS users (
         user_id TEXT PRIMARY KEY, 
         xp INTEGER DEFAULT 0, 
         level INTEGER DEFAULT 0, 
-        last_daily INTEGER DEFAULT 0
+        last_daily INTEGER DEFAULT 0,
+        balance INTEGER DEFAULT 0
     )`);
-    db.run(`CREATE TABLE IF NOT EXISTS role_messages (
-        message_id TEXT PRIMARY KEY,
-        guild_id TEXT
-    )`);
+    db.run(`CREATE TABLE IF NOT EXISTS role_messages (message_id TEXT PRIMARY KEY, guild_id TEXT)`);
 });
 
 // =======================
@@ -80,6 +78,12 @@ const panels = [
     { title: "Games ♡", roles: { "🔪": "DBD", "💥": "Shooters", "🍄": "Minecraft", "🔴": "Pokemon", "🕯️": "Spooky Time" } },
     { title: "Identity ♡", roles: { "♀️": "She/Her", "♂️": "He/Him", "🫧": "They/Them", "💌": "DM'S Open", "🔞": "18+", "🧸": "Under 18" } },
     { title: "Server ♡", roles: { "🎬": "Movie Night", "🤝": "Partner Servers", "🎉": "Server Events" } }
+];
+
+const shopItems = [
+    { name: "VIP Role", price: 5000, description: "Claim the prestigious VIP role!" },
+    { name: "XP Booster", price: 1500, description: "Get a temporary boost to your level!" },
+    { name: "Chaos King", price: 10000, description: "A special title for the most chaotic members." }
 ];
 
 // =======================
@@ -155,6 +159,7 @@ client.once("ready", () => {
 });
 
 client.on("messageCreate", async (message) => {
+    const args = message.content.split(" ");
     if (message.author.bot || !message.guild) return;
 
     addXP(message.author.id, message.guild);
@@ -233,6 +238,69 @@ client.on("messageCreate", async (message) => {
         });
         return;
     }
+    // --- START ECONOMY LOGIC ---
+    
+    // 1. Passive Income: 10% chance to find $1-5 when chatting
+    const moneyFound = Math.random() < 0.1 ? Math.floor(Math.random() * 5) + 1 : 0;
+    if (moneyFound > 0) {
+        db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [moneyFound, message.author.id]);
+    }
+
+    // 2. !bal / !balance
+    if (content === "!bal" || content === "!balance") {
+        db.get("SELECT balance FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
+            const bal = row?.balance || 0;
+            message.reply(`💰 **${message.author.username}**, you have **$${bal}** in your wallet!`);
+        });
+        return;
+    }
+
+    // 3. !work
+    if (content === "!work") {
+        const payout = Math.floor(Math.random() * 50) + 20;
+        db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [payout, message.author.id]);
+        message.reply(`🛠️ You worked a shift and earned **$${payout}**!`);
+        return;
+    }
+
+    // 4. !slots <amount>
+    if (args[0] === "!slots") {
+        const bet = parseInt(args[1]);
+        if (!bet || bet <= 0) return message.reply("How much do you want to bet? usage: `!slots 50` 💜");
+        
+        db.get("SELECT balance FROM users WHERE user_id = ?", [message.author.id], (err, row) => {
+            if (!row || row.balance < bet) return message.reply("You're broke! Work a bit more first. 💸");
+
+            const icons = ["🍒", "💎", "⭐", "🍎"];
+            const r1 = icons[Math.floor(Math.random() * icons.length)];
+            const r2 = icons[Math.floor(Math.random() * icons.length)];
+            const r3 = icons[Math.floor(Math.random() * icons.length)];
+
+            if (r1 === r2 && r2 === r3) {
+                const win = bet * 5;
+                db.run("UPDATE users SET balance = balance + ? WHERE user_id = ?", [win, message.author.id]);
+                message.reply(`[ ${r1} | ${r2} | ${r3} ]\n**JACKPOT!** You won **$${win}**! 🎉`);
+            } else {
+                db.run("UPDATE users SET balance = balance - ? WHERE user_id = ?", [bet, message.author.id]);
+                message.reply(`[ ${r1} | ${r2} | ${r3} ]\nYou lost **$${bet}**. Better luck next time! 💜`);
+            }
+        });
+        return;
+    }
+
+    // 5. !shop
+    if (content === "!shop") {
+        const list = shopItems.map((item, i) => `**${i+1}. ${item.name}** — $${item.price}\n*${item.description}*`).join("\n\n");
+        const embed = new EmbedBuilder()
+            .setTitle("🛍️ Server Shop")
+            .setDescription(list)
+            .setColor(0xffcc00)
+            .setFooter({ text: "Use !buy <number> to purchase!" });
+        message.channel.send({ embeds: [embed] });
+        return;
+    }
+
+    // --- END ECONOMY LOGIC ---
 
     // Personality triggers
     if (message.mentions.has(client.user)) {
