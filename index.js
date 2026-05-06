@@ -241,6 +241,31 @@ async function addXP(userId, guild) {
 // =======================
 // EVENT HANDLERS
 // =======================
+// =======================
+// WELCOME MESSAGE
+// =======================
+client.on("guildMemberAdd", async (member) => {
+    try {
+        const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
+        if (!channel) return;
+
+        const welcomeEmbed = new EmbedBuilder()
+            .setColor(0xff66cc)
+            .setTitle("✨ A new bestie has arrived! ✨")
+            .setDescription(`hi hi <@${member.id}>! 💜\nWelcome to **${member.guild.name}**! We are so happy you're here. ✨`)
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .addFields(
+                { name: "📜 Rules", value: "Check out #rules to get started!", inline: true },
+                { name: "🎭 Roles", value: "Grab your roles in !roles", inline: true }
+            )
+            .setFooter({ text: `Member #${member.guild.memberCount}` })
+            .setTimestamp();
+
+        channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
+    } catch (e) {
+        console.error("Welcome error:", e.message);
+    }
+});
 client.once("ready", () => {
   client.user.setPresence({
         status: "online",
