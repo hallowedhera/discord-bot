@@ -244,8 +244,20 @@ async function addXP(userId, guild) {
 // =======================
 // WELCOME MESSAGE
 // =======================
+// =======================
+// WELCOME & AUTO-ROLE
+// =======================
 client.on("guildMemberAdd", async (member) => {
     try {
+        // 1. Give the "Minions" Role Automatically
+        const autoRoleName = "Minions"; 
+        const role = member.guild.roles.cache.find(r => r.name === autoRoleName);
+        
+        if (role) {
+            await member.roles.add(role).catch(e => console.log("Auto-role error:", e.message));
+        }
+
+        // 2. Send the Welcome Message
         const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
         if (!channel) return;
 
@@ -258,12 +270,13 @@ client.on("guildMemberAdd", async (member) => {
                 { name: "📜 Rules", value: "Check out #rules to get started!", inline: true },
                 { name: "🎭 Roles", value: "Grab your roles in !roles", inline: true }
             )
-            .setFooter({ text: `Member #${member.guild.memberCount}` })
+            .setFooter({ text: `Member #${member.guild.memberCount} 🎀` })
             .setTimestamp();
 
         channel.send({ content: `Welcome 💜 <@${member.id}>!`, embeds: [welcomeEmbed] });
+
     } catch (e) {
-        console.error("Welcome error:", e.message);
+        console.error("Welcome System Error:", e.message);
     }
 });
 client.once("ready", () => {
