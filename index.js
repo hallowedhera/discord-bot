@@ -231,16 +231,19 @@ client.once("ready", () => {
         
     });
     // Heartbeat System
+// Heartbeat System (2-Hour Interval)
     let lastHeartbeat = 0;
     setInterval(() => {
         const now = Date.now();
-        if (now - lastHeartbeat < 1700000) return; 
-        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
+        // Skip if it hasn't been at least 1 hour and 55 minutes (6,900,000 ms)
+        if (now - lastHeartbeat < 6900000) return; 
+
+        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID); // ✅ Changed to Alert Channel to keep General clean
         if (channel) {
             channel.send("💜 I’m still online!").catch(() => {});
             lastHeartbeat = now;
         }
-    }, 1000 * 60 * 30);
+    }, 1000 * 60 * 120); // 120 minutes = 2 hours
 
 
     // --- FEATURE: Random Messages every 12 Hours ---
@@ -283,8 +286,6 @@ client.on("messageCreate", async (message) => {
 
     addXP(message.author.id, message.guild);
     const content = message.content.toLowerCase();
-// Always run XP tracking first
-    addXP(message.author.id, message.guild);
 
     // =======================
     // HELP COMMAND
