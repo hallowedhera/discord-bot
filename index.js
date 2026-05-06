@@ -5,6 +5,8 @@ const TOKEN = process.env.DISCORD_TOKEN;
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
 const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID;
+const LEAVE_CHANNEL_ID = process.env.LEAVE_CHANNEL_ID;
+const WELCOME_CHANNEL_ID = process.env.WELCOME_CHANNEL_ID;
 const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
 const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
 const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
@@ -275,6 +277,30 @@ client.on("guildMemberAdd", async (member) => {
 
     } catch (e) {
         console.error("Welcome System Error:", e.message);
+    }
+});
+// =======================
+// SYSTEM MONITORING (LEAVES)
+// =======================
+client.on("guildMemberRemove", async (member) => {
+    try {
+        const channel = member.guild.channels.cache.get(LEAVE_CHANNEL_ID);
+        if (!channel) return;
+
+        const leaveEmbed = new EmbedBuilder()
+            .setColor(0xff0000) // Red for leaves
+            .setTitle("💔 Member Left")
+            .setThumbnail(member.user.displayAvatarURL())
+            .setDescription(`**${member.user.tag}** has left the server.`)
+            .addFields(
+                { name: "ID", value: `\`${member.id}\``, inline: true },
+                { name: "New Total", value: `${member.guild.memberCount}`, inline: true }
+            )
+            .setTimestamp();
+
+        channel.send({ embeds: [leaveEmbed] });
+    } catch (e) {
+        console.error("Leave Log Error:", e.message);
     }
 });
 client.once("ready", () => {
