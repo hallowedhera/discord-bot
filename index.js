@@ -323,7 +323,6 @@ async function checkTikTok() {
 // =======================
 // RUN LOOPS
 // =======================
-setInterval(checkYouTube, 60000);
 setInterval(checkTwitch, 90000);
 setInterval(checkTikTok, 120000);
 
@@ -409,11 +408,15 @@ if (content === "!roles") {
           { name: "📊 Level", value: `${level}`, inline: true },
           { name: "✨ XP", value: `${xp}`, inline: true },
           { name: "🎯 Next Level", value: `${nextLevelXP}`, inline: true }
-        )
-        .setFooter({ text: "keep chatting to level up 💜" });
+        );
 
       message.reply({ embeds: [embed] });
-      if (content === "!leaderboard") {
+    }
+  );
+  return;
+}
+
+if (content === "!leaderboard") {
   db.all(
     "SELECT user_id, xp, level FROM users ORDER BY xp DESC LIMIT 10",
     async (err, rows) => {
@@ -435,15 +438,12 @@ if (content === "!roles") {
       const embed = new EmbedBuilder()
         .setColor(0x00ccff)
         .setTitle("🏆 XP Leaderboard")
-        .setDescription(description.join("\n"))
-        .setFooter({ text: "rankings based on activity 💜" });
+        .setDescription(description.join("\n"));
 
       message.channel.send({ embeds: [embed] });
     }
   );
-}
-    }
-  );
+  return;
 }
 
   const now = Date.now();
@@ -471,11 +471,13 @@ client.once("ready", () => {
     activities: [{ name: "💜 Always On ✨", type: 0 }]
   });
 });
-setInterval(() => {
-  sendAlert("💜 just checking in... I'm still here!");
-}, 1000 * 60 * 30);
-
+if (ALERT_CHANNEL_ID) {
+  setInterval(() => {
+    sendAlert("💜 just checking in... I'm still here!");
+  }, 1000 * 60 * 30);
+}
 // =======================
 // LOGIN
 // =======================
 client.login(process.env.DISCORD_TOKEN);
+console.log("MESSAGE RECEIVED:", message.content);
