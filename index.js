@@ -2,8 +2,13 @@
 // CONFIG & ENV
 // =======================
 const TOKEN = process.env.DISCORD_TOKEN;
+const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
-const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID || ALERT_CHANNEL_ID;
+const LEVEL_CHANNEL_ID = process.env.LEVEL_CHANNEL_ID;
+const TWITCH_CLIENT_ID = process.env.TWITCH_CLIENT_ID;
+const TWITCH_CLIENT_SECRET = process.env.TWITCH_CLIENT_SECRET;
+const TWITCH_USERNAME = process.env.TWITCH_USERNAME;
+const TIKTOK_USERNAME = process.env.TIKTOK_USERNAME;
 const PORT = process.env.PORT || 10000;
 
 const { 
