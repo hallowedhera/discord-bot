@@ -384,30 +384,24 @@ if (!userData) {
     userData = new User({ userId: message.author.id, guildId: message.guild.id });
 }
 
-// Helper function to calculate XP needed for the next level
-// Formula: 100 * (level ^ 1.5) + (level * 50) + 100
-function getXPForNextLevel(currentLevel) {
-    return Math.floor(100 * Math.pow(currentLevel, 1.5) + (currentLevel * 50) + 100);
-}
-
-// Add XP
+// Add the XP
 userData.xp += 10; 
 
-// Calculate the target XP threshold for their current level
-let nextLevelXP = getXPForNextLevel(userData.level);
+// Calculate the next level requirements using proper JS syntax
+// Formula: 100 * (level raised to 1.5) + (level * 50) + 100
+const nextLevelXP = Math.floor(100 * Math.pow(userData.level, 1.5) + (userData.level * 50) + 100);
 
-// Check if they leveled up (using a 'while' loop in case they gained enough XP to skip a level)
-let leveledUp = false;
-while (userData.xp >= nextLevelXP) {
-    userData.xp -= nextLevelXP; // Subtract the required XP (carries over the leftover XP)
-    userData.level++;           // Increase level
-    nextLevelXP = getXPForNextLevel(userData.level); // Recalculate target for the new level
-    leveledUp = true;
-}
+// Check if they leveled up and close the code block correctly
+if (userData.xp >= nextLevelXP) {
+    userData.xp -= nextLevelXP; // Carry over excess XP
+    userData.level++;           // Increment the level
+    
+    // Send congratulations
+    message.channel.send(`🎉 Congrats <@${message.author.id}>, you leveled up to **Level ${userData.level}**!`);
+} // <--- Added the missing closing bracket
 
-// Save the updated user data to MongoDB
+// Save the document to your database
 await userData.save();
-
 // Send congratulations if they leveled up
 if (leveledUp) {
     message.channel.send(`🎉 **Level Up!** <@${message.author.id}>, you are now **Level ${userData.level}**!`);
@@ -424,7 +418,6 @@ try {
 } catch (error) {
     console.error("Failed to find level channel:", error);
     message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
-}
 }
     await userData.save();
 
