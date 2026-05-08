@@ -401,7 +401,7 @@ client.once("ready", () => {
                 try {
                     const channel = await client.channels.fetch(ENHANCEMENTS_CHANNEL_ID);
                     if (channel) {
-                        await channel.send('🔔 **The server is ready to be bumped!** Type `/bump` to help us grow! @everyone');
+                        await channel.send('🔔 **The server is ready to be bumped!** Type `/bump` to help us grow! @Hera @Ban Hammer Abuser 🛠 ');
                         console.log('Bump reminder sent to enhancements channel.');
                     }
                 } catch (error) {
@@ -409,6 +409,7 @@ client.once("ready", () => {
                 }
             }, TWO_HOURS);
         }
+    }
 // 1. XP LOGIC
 let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
 if (!userData) {
