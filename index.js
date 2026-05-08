@@ -337,7 +337,7 @@ client.once("ready", () => {
             channel.send("💜 I’m still online!").catch(() => {});
             lastHeartbeat = now;
         }
-    }, 1000 * 60 * 120); // 120 minutes = 2 hours
+    }, 1000 * 60 * 640); // 120 minutes = 2 hours
 
 
     // --- FEATURE: Random Messages every 12 Hours ---
@@ -386,10 +386,23 @@ client.once("ready", () => {
 
     userData.xp += 10; 
     const nextLevelXP = userData.level * 100;
-    if (userData.xp >= nextLevelXP) {
-        userData.level++;
-        message.reply(`✨ **Level Up!** You've reached level **${userData.level}**, little pixie! 🧚‍♀️`);
+if (userData.xp >= nextLevelXP) {
+    userData.level++;
+    
+   // 1. Try to find the channel (async fetch is more reliable than cache)
+try {
+    const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
+
+    if (levelChannel) {
+        levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}**, little pixie! 🧚‍♀️`);
+    } else {
+        message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
     }
+} catch (error) {
+    console.error("Failed to find level channel:", error);
+    message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
+}
+}
     await userData.save();
 
     // 2. HELP COMMAND
