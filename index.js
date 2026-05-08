@@ -378,17 +378,40 @@ client.once("ready", () => {
     const content = message.content.toLowerCase();
     const args = message.content.split(" ");
 
-    // 1. XP LOGIC
-    let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
-    if (!userData) {
-        userData = new User({ userId: message.author.id, guildId: message.guild.id });
-    }
+// 1. XP LOGIC
+let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
+if (!userData) {
+    userData = new User({ userId: message.author.id, guildId: message.guild.id });
+}
 
-    userData.xp += 10; 
-    const nextLevelXP = userData.level * 100;
-if (userData.xp >= nextLevelXP) {
-    userData.level++;
-    
+// Helper function to calculate XP needed for the next level
+// Formula: 100 * (level ^ 1.5) + (level * 50) + 100
+function getXPForNextLevel(currentLevel) {
+    return Math.floor(100 * Math.pow(currentLevel, 1.5) + (currentLevel * 50) + 100);
+}
+
+// Add XP
+userData.xp += 10; 
+
+// Calculate the target XP threshold for their current level
+let nextLevelXP = getXPForNextLevel(userData.level);
+
+// Check if they leveled up (using a 'while' loop in case they gained enough XP to skip a level)
+let leveledUp = false;
+while (userData.xp >= nextLevelXP) {
+    userData.xp -= nextLevelXP; // Subtract the required XP (carries over the leftover XP)
+    userData.level++;           // Increase level
+    nextLevelXP = getXPForNextLevel(userData.level); // Recalculate target for the new level
+    leveledUp = true;
+}
+
+// Save the updated user data to MongoDB
+await userData.save();
+
+// Send congratulations if they leveled up
+if (leveledUp) {
+    message.channel.send(`🎉 **Level Up!** <@${message.author.id}>, you are now **Level ${userData.level}**!`);
+}
    // 1. Try to find the channel (async fetch is more reliable than cache)
 try {
     const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
