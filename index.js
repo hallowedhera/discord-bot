@@ -15,6 +15,8 @@ const MONGO_URI = process.env.MONGO_URI;
 const ENHANCEMENTS_CHANNEL_ID = process.env.ENHANCEMENTS_CHANNEL_ID;
 const DISBOARD_BOT_ID = '302050872383242240'; // Official Disboard Bot Client ID
 const TWO_HOURS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
+// Add this right under your process.env variables at the top of the file:
+let activeBumpTimeout = null;
 
 // 1. IMPORT ALL TOOLS (This MUST be the very first thing)
 const express = require("express");
@@ -608,6 +610,7 @@ async function toggleRole(reaction, user, add = true) {
     const roleName = reactionRolesMap[reaction.emoji.name];
     if (!roleName) return;
 
+      // Locate this line inside the toggleRole function near the bottom:
     const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
     const member = await reaction.message.guild.members.fetch(user.id).catch(() => {});
 
@@ -618,6 +621,7 @@ async function toggleRole(reaction, user, add = true) {
             await member.roles.remove(role).catch(e => console.error(`Remove role error: ${e}`));
         }
     }
+
 }
 
 client.on("messageReactionAdd", (r, u) => toggleRole(r, u, true));
