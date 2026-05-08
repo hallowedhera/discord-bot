@@ -445,7 +445,7 @@ try {
     const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
 
     if (levelChannel) {
-        levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}**, little pixie! 🧚‍♀️`);
+        levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}** (˶ᵔ ᵕ ᵔ˶)`);
     } else {
         message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
     }
@@ -516,7 +516,7 @@ try {
         const now = Date.now();
         if (now - userData.lastDaily < 86400000) {
             const remaining = Math.ceil((86400000 - (now - userData.lastDaily)) / 3600000);
-            return message.reply(`Slow down, little pixie! Try again in ${remaining} hours. 🎀`);
+            return message.reply(`Slow down! Try again in ${remaining} hours. 🎀`);
         }
         userData.xp += 50;
         userData.lastDaily = now;
