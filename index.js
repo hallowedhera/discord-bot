@@ -323,12 +323,35 @@ client.on("guildMemberRemove", async (member) => {
         console.error("Leave Log Error:", e.message);
     }
 });
+// =======================
+// BOT READY EVENTS
+// =======================
 client.once("ready", () => {
-    client.user.setPresence({
-        status: "online",
-        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
-    });
+    console.log("🚩 READY EVENT TRIGGERED!");
 
+    try {
+        client.user.setPresence({
+            status: "online",
+            activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
+        });
+        console.log("✅ Presence set successfully!");
+    } catch (err) {
+        console.error("❌ Failed to set presence:", err.message);
+    }
+
+    console.log("⏰ Schedules initialized!");
+});
+
+// Start your loops OUTSIDE the ready block so they can't freeze the bot's login
+try {
+    // Only run checkTwitch if it's defined and active
+    if (typeof checkTwitch === "function") {
+        setInterval(checkTwitch, 90000);
+        console.log("📡 Twitch monitor started in background.");
+    }
+} catch (e) {
+    console.error("❌ Failed to start Twitch loop:", e.message);
+}
     console.log("✅ Hera has successfully logged into Discord!");
 
     // Start Twitch and TikTok monitoring ONLY after we are online
