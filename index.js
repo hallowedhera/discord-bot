@@ -29,6 +29,7 @@ const {
     ActivityType 
 } = require("discord.js"); // <--- This is what defines "Client"
 
+
 // 2. CONFIG & PORT
 const PORT = process.env.PORT || 10000;
 
@@ -51,11 +52,6 @@ async function connectDatabase() {
     }
 }
 connectDatabase(); // Runs asynchronously, letting the bot login immediately!
-// FORCE LOGIN IMMEDIATELY
-process.on("unhandledRejection", console.error);
-process.on("uncaughtException", console.error);
-console.log("🚀 Attempting Discord Gateway Connection...");
-client.login(process.env.DISCORD_TOKEN);
 
 const userSchema = new mongoose.Schema({
     userId: String,
@@ -84,6 +80,11 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
+// LOGIN IMMEDIATELY AFTER CREATING THE CLIENT
+process.on("unhandledRejection", console.error);
+process.on("uncaughtException", console.error);
+console.log("🚀 Attempting Discord Gateway Connection...");
+client.login(process.env.DISCORD_TOKEN);
 // =======================
 // ALERTS
 // =======================
