@@ -326,6 +326,7 @@ client.on("guildMemberRemove", async (member) => {
 // =======================
 // BOT READY EVENTS
 // =======================
+// =======================
 client.once("ready", () => {
     console.log("🚩 READY EVENT TRIGGERED!");
     
@@ -339,10 +340,13 @@ client.once("ready", () => {
             status: "dnd",
             activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
         });
+        console.log("✅ Presence set successfully!");
+    } catch (err) {
+        console.error("❌ Failed to set presence:", err.message);
+    }
 
     console.log("⏰ Schedules initialized!");
-});
-
+}); // <-- Properly closes the ready event!
 // Start your loops OUTSIDE the ready block so they can't freeze the bot's login
 try {
     // Only run checkTwitch if it's defined and active
