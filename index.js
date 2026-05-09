@@ -1,6 +1,6 @@
 // =======================
 // CONFIG & ENV
-// =======================
+require('dotenv').config();// =======================
 const TOKEN = process.env.DISCORD_TOKEN;
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
@@ -421,40 +421,30 @@ if (!userData) {
 // Add the XP
 userData.xp += 10; 
 
-// Calculate the next level requirements using proper JS syntax
-// Formula: 100 * (level raised to 1.5) + (level * 50) + 100
+// Calculate requirements: 100 * (level ^ 1.5) + (level * 50) + 100
 const nextLevelXP = Math.floor(100 * Math.pow(userData.level, 1.5) + (userData.level * 50) + 100);
 
-// Check if they leveled up and close the code block correctly
+// Check if they leveled up
 if (userData.xp >= nextLevelXP) {
     userData.xp -= nextLevelXP; // Carry over excess XP
     userData.level++;           // Increment the level
     
-    // Send congratulations
-    message.channel.send(`🎉 Congrats <@${message.author.id}>, you leveled up to **Level ${userData.level}**!`);
-} // <--- Added the missing closing bracket
-
-// Save the document to your database
-await userData.save();
-// Send congratulations if they leveled up
-if (leveledUp) {
-    message.channel.send(`🎉 **Level Up!** <@${message.author.id}>, you are now **Level ${userData.level}**!`);
-}
-   // 1. Try to find the channel (async fetch is more reliable than cache)
-try {
-    const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
-
-    if (levelChannel) {
-        levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}** (˶ᵔ ᵕ ᵔ˶)`);
-    } else {
-        message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
+    // Try to send the announcement to your designated level-up channel
+    try {
+        const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
+        if (levelChannel) {
+            await levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}** (˶ᵔ ᵕ ᵔ˶)`);
+        } else {
+            await message.reply(`🎉 **Level Up!** You've reached level **${userData.level}**!`);
+        }
+    } catch (error) {
+        console.error("Failed to find level channel:", error.message);
+        await message.reply(`🎉 **Level Up!** You've reached level **${userData.level}**!`);
     }
-} catch (error) {
-    console.error("Failed to find level channel:", error);
-    message.reply(`✨ **Level Up!** You've reached level **${userData.level}**!`);
 }
-    await userData.save();
 
+// Save the updated profile to MongoDB
+await userData.save();
     // 2. HELP COMMAND
     if (content === "!help") {
         const embed = new EmbedBuilder()
