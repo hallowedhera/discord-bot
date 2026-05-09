@@ -407,7 +407,6 @@ try {
     });
 
     console.log("⏰ Schedules initialized!");
-});
     client.on("messageCreate", async (message) => {
     // If the message is from a bot, we only care if it's the Disboard bot
     if (message.author.bot && message.author.id !== DISBOARD_BOT_ID) return;
