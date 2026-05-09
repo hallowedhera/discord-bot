@@ -81,10 +81,31 @@ const client = new Client({
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
 // LOGIN IMMEDIATELY AFTER CREATING THE CLIENT
-process.on("unhandledRejection", console.error);
-process.on("uncaughtException", console.error);
+process.on("unhandledRejection", (reason, promise) => {
+    console.error("🚨 UNHANDLED REJECTION AT:", promise, "REASON:", reason);
+});
+process.on("uncaughtException", (err) => {
+    console.error("🚨 UNCAUGHT EXCEPTION:", err.stack || err);
+});
+
 console.log("🚀 Attempting Discord Gateway Connection...");
-client.login(process.env.DISCORD_TOKEN);
+
+// Diagnostic checks:
+if (!process.env.DISCORD_TOKEN) {
+    console.log("❌ ERROR: DISCORD_TOKEN is completely UNDEFINED in Render's environment variables!");
+} else {
+    console.log(`📡 Token found! Length: ${process.env.DISCORD_TOKEN.length} characters.`);
+    console.log(`📡 Token starts with: "${process.env.DISCORD_TOKEN.substring(0, 10)}..."`);
+}
+
+// Force login and catch any immediate promise rejections
+client.login(process.env.DISCORD_TOKEN)
+    .then(() => {
+        console.log("🎯 client.login() promise successfully resolved!");
+    })
+    .catch((err) => {
+        console.error("❌ client.login() FAILED WITH ERROR:", err);
+    });
 // =======================
 // ALERTS
 // =======================
