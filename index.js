@@ -51,6 +51,11 @@ async function connectDatabase() {
     }
 }
 connectDatabase(); // Runs asynchronously, letting the bot login immediately!
+// FORCE LOGIN IMMEDIATELY
+process.on("unhandledRejection", console.error);
+process.on("uncaughtException", console.error);
+console.log("🚀 Attempting Discord Gateway Connection...");
+client.login(process.env.DISCORD_TOKEN);
 
 const userSchema = new mongoose.Schema({
     userId: String,
@@ -644,12 +649,3 @@ async function toggleRole(reaction, user, add = true) {
 
 client.on("messageReactionAdd", (r, u) => toggleRole(r, u, true));
 client.on("messageReactionRemove", (r, u) => toggleRole(r, u, false));
-
-// =======================
-// ERROR HANDLING
-// =======================
-process.on("unhandledRejection", console.error);
-process.on("uncaughtException", console.error);
-console.log("START");
-
-client.login(process.env.DISCORD_TOKEN);
