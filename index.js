@@ -330,8 +330,8 @@ client.once("ready", () => {
     console.log("🚩 READY EVENT TRIGGERED!");
 
     try {
-        client.user.setPresence({
-            status: "online",
+       client.user.setPresence({
+            status: "dnd",
             activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
         });
         console.log("✅ Presence set successfully!");
