@@ -70,15 +70,23 @@ const User = mongoose.model("User", userSchema);
 
 // 5. CREATE THE BOT CLIENT (Only do this ONCE)
 const client = new Client({
-    intents: [
-        GatewayIntentBits.Guilds,
-        GatewayIntentBits.GuildMessages,
-        GatewayIntentBits.MessageContent,
-        GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMembers,
-        GatewayIntentBits.GuildPresences // <--- ADD THIS ONE!
-    ],
-    partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
+    intents: [
+        GatewayIntentBits.Guilds,
+        GatewayIntentBits.GuildMessages,
+        GatewayIntentBits.MessageContent,
+        GatewayIntentBits.GuildMessageReactions,
+        GatewayIntentBits.GuildMembers
+    ],
+    partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel],
+    
+    // FORCE DISCORD TO SHOW HER AS ONLINE IMMEDIATELY ON CONNECT
+    presence: {
+        status: "online", 
+        activities: [{
+            name: "over the forest 🌿",
+            type: ActivityType.Watching
+        }]
+    }
 });
 // LOGIN IMMEDIATELY AFTER CREATING THE CLIENT
 process.on("unhandledRejection", (reason, promise) => {
