@@ -1,6 +1,4 @@
-// =======================
-// CONFIG & ENV
-require('dotenv').config();// =======================
+
 const TOKEN = process.env.DISCORD_TOKEN;
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
