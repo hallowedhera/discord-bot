@@ -328,16 +328,17 @@ client.on("guildMemberRemove", async (member) => {
 // =======================
 client.once("ready", () => {
     console.log("🚩 READY EVENT TRIGGERED!");
+    
+    // ADD THESE THREE LINES:
+    console.log(`🤖 RUNNING BOT USERNAME: ${client.user.tag}`);
+    console.log(`🆔 RUNNING BOT CLIENT ID: ${client.user.id}`);
+    console.log(`🔗 DIRECT INVITE LINK: https://discord.com/oauth2/authorize?client_id=${client.user.id}&permissions=8&scope=bot`);
 
     try {
-       client.user.setPresence({
+        client.user.setPresence({
             status: "dnd",
             activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
         });
-        console.log("✅ Presence set successfully!");
-    } catch (err) {
-        console.error("❌ Failed to set presence:", err.message);
-    }
 
     console.log("⏰ Schedules initialized!");
 });
