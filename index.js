@@ -375,19 +375,12 @@ client.once("ready", () => {
     console.log("⏰ Schedules initialized!");
 });
     client.on("messageCreate", async (message) => {
-    if (message.author.bot || !message.guild) return;
-
-    const content = message.content.toLowerCase();
-    const args = message.content.split(" ");
-
- client.on("messageCreate", async (message) => {
     // If the message is from a bot, we only care if it's the Disboard bot
     if (message.author.bot && message.author.id !== DISBOARD_BOT_ID) return;
     if (!message.guild) return;
 
     const content = message.content.toLowerCase();
     const args = message.content.split(" ");
-
     // 1. Disboard Bump Timer Logic (Only runs if the sender is Disboard)
     if (message.author.id === DISBOARD_BOT_ID) {
         if (message.interaction && message.interaction.commandName === 'bump') {
