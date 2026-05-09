@@ -29,7 +29,6 @@ const {
     ActivityType 
 } = require("discord.js"); // <--- This is what defines "Client"
 
-
 // 2. CONFIG & PORT
 const PORT = process.env.PORT || 10000;
 
@@ -76,7 +75,8 @@ const client = new Client({
         GatewayIntentBits.GuildMessages,
         GatewayIntentBits.MessageContent,
         GatewayIntentBits.GuildMessageReactions,
-        GatewayIntentBits.GuildMembers 
+        GatewayIntentBits.GuildMembers,
+        GatewayIntentBits.GuildPresences // <--- ADD THIS ONE!
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
