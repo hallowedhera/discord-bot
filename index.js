@@ -40,12 +40,17 @@ app.listen(PORT, () => console.log(`🌿 Forest Monitoring active on port ${PORT
 // 4. INITIALIZE DATABASE
 // =======================
 // 4. INITIALIZE DATABASE
-mongoose.connect(MONGO_URI) // Use the variable you defined at the top
-    .then(() => console.log("✨ Connected to the Fairy Cloud (MongoDB)!"))
-    .catch(err => {
-        console.error("❌ MongoDB Connection Error:", err.message);
-        console.log("⚠️ Continuing without DB - leveling/economy will fail.");
-    });
+// 4. INITIALIZE DATABASE (Non-blocking background connection)
+async function connectDatabase() {
+    try {
+        await mongoose.connect(MONGO_URI);
+        console.log("✨ Connected to the Fairy Cloud (MongoDB)!");
+    } catch (err) {
+        console.error("❌ MongoDB Connection Error:", err.message);
+        console.log("⚠️ Continuing without DB - leveling/economy will fail.");
+    }
+}
+connectDatabase(); // Runs asynchronously, letting the bot login immediately!
 
 const userSchema = new mongoose.Schema({
     userId: String,
