@@ -123,12 +123,10 @@ async function checkTwitch() {
       seenTwitchLive.delete(TWITCH_USERNAME);
     }
 
-  } catch (e) {
-    console.log("Twitch error:", e.message);
-  }
+} catch (e) {
+    console.log("Twitch error:", e.message);
+  }
 }
-setInterval(checkTwitch, 90000);
-setInterval(checkTikTok, 120000);
 
 const seenTikTokVideo = new Set();
 
@@ -321,11 +319,19 @@ client.on("guildMemberRemove", async (member) => {
     }
 });
 client.once("ready", () => {
-  client.user.setPresence({
-        status: "online",
-        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
-        
-    });
+    client.user.setPresence({
+        status: "online",
+        activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
+    });
+
+    console.log("✅ Hera has successfully logged into Discord!");
+
+    // Start Twitch and TikTok monitoring ONLY after we are online
+    setInterval(checkTwitch, 90000);
+    setInterval(checkTikTok, 120000);
+    console.log("📡 Social media monitors started.");
+
+    // Heartbeat System (2-Hour Interval)
     // Heartbeat System
 // Heartbeat System (2-Hour Interval)
     let lastHeartbeat = 0;
