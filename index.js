@@ -1,4 +1,3 @@
-
 const TOKEN = process.env.DISCORD_TOKEN;
 const GENERAL_CHANNEL_ID = process.env.GENERAL_CHANNEL_ID;
 const ALERT_CHANNEL_ID = process.env.ALERT_CHANNEL_ID;
@@ -13,7 +12,7 @@ const MONGO_URI = process.env.MONGO_URI;
 const ENHANCEMENTS_CHANNEL_ID = process.env.ENHANCEMENTS_CHANNEL_ID;
 const DISBOARD_BOT_ID = '302050872383242240'; // Official Disboard Bot Client ID
 const TWO_HOURS = 2 * 60 * 60 * 1000; // 2 hours in milliseconds
-// Add this right under your process.env variables at the top of the file:
+
 let activeBumpTimeout = null;
 
 // 1. IMPORT ALL TOOLS (This MUST be the very first thing)
@@ -28,7 +27,7 @@ const {
     Partials, 
     EmbedBuilder, 
     ActivityType 
-} = require("discord.js"); // <--- This is what defines "Client"
+} = require("discord.js");
 
 // 2. CONFIG & PORT
 const PORT = process.env.PORT || 10000;
@@ -39,9 +38,7 @@ app.get("/", (req, res) => res.send("Bot is active."));
 app.listen(PORT, () => console.log(`🌿 Forest Monitoring active on port ${PORT}`));
 
 // 4. INITIALIZE DATABASE
-// =======================
-// 4. INITIALIZE DATABASE
-mongoose.connect(MONGO_URI) // Use the variable you defined at the top
+mongoose.connect(MONGO_URI)
     .then(() => console.log("✨ Connected to the Fairy Cloud (MongoDB)!"))
     .catch(err => {
         console.error("❌ MongoDB Connection Error:", err.message);
@@ -53,18 +50,17 @@ const userSchema = new mongoose.Schema({
     guildId: String,
     xp: { type: Number, default: 0 },
     level: { type: Number, default: 1 },
-    balance: { type: Number, default: 0 }, // Added for economy
-    lastDaily: { type: Number, default: 0 } // Added for daily command
+    balance: { type: Number, default: 0 },
+    lastDaily: { type: Number, default: 0 }
 });
 const roleMessageSchema = new mongoose.Schema({
     messageId: String,
     guildId: String
 });
 const RoleMessage = mongoose.model("RoleMessage", roleMessageSchema);
-
 const User = mongoose.model("User", userSchema);
 
-// 5. CREATE THE BOT CLIENT (Only do this ONCE)
+// 5. CREATE THE BOT CLIENT
 const client = new Client({
     intents: [
         GatewayIntentBits.Guilds,
@@ -75,31 +71,28 @@ const client = new Client({
     ],
     partials: [Partials.Message, Partials.Reaction, Partials.User, Partials.Channel]
 });
+
 // =======================
 // ALERTS
 // =======================
 async function sendAlert(msg) {
   try {
     if (!ALERT_CHANNEL_ID) return;
-
     const channel = await client.channels.fetch(ALERT_CHANNEL_ID);
     if (!channel) return;
-
     channel.send(msg);
   } catch (e) {
     console.log("Alert error:", e.message);
   }
 }
-const seenTwitchLive = new Set();
 
+const seenTwitchLive = new Set();
 async function checkTwitch() {
   try {
     const token = await axios.post(
       `https://id.twitch.tv/oauth2/token?client_id=${TWITCH_CLIENT_ID}&client_secret=${TWITCH_CLIENT_SECRET}&grant_type=client_credentials`
     );
-
     const access = token.data.access_token;
-
     const res = await axios.get(
       `https://api.twitch.tv/helix/streams?user_login=${TWITCH_USERNAME}`,
       {
@@ -109,53 +102,36 @@ async function checkTwitch() {
         }
       }
     );
-
     const isLive = res.data.data.length > 0;
-
     if (isLive && !seenTwitchLive.has(TWITCH_USERNAME)) {
       seenTwitchLive.add(TWITCH_USERNAME);
-
-      sendAlert(
-        `🔴 **LIVE NOW ON TWITCH**\nhttps://twitch.tv/${TWITCH_USERNAME}`
-      );
+      sendAlert(`🔴 **LIVE NOW ON TWITCH**\nhttps://twitch.tv/${TWITCH_USERNAME}`);
     }
-
     if (!isLive) {
       seenTwitchLive.delete(TWITCH_USERNAME);
     }
-
   } catch (e) {
     console.log("Twitch error:", e.message);
   }
 }
 setInterval(checkTwitch, 90000);
-setInterval(checkTikTok, 120000);
 
 const seenTikTokVideo = new Set();
-
 async function checkTikTok() {
   try {
-    const res = await axios.get(
-      `https://www.tiktok.com/@${TIKTOK_USERNAME}?lang=en`
-    );
-
+    const res = await axios.get(`https://www.tiktok.com/@${TIKTOK_USERNAME}?lang=en`);
     const match = res.data.match(/video\/(\d{15,})/g);
     if (!match) return;
-
     const latest = match[0];
-
     if (seenTikTokVideo.has(latest)) return;
-
     seenTikTokVideo.add(latest);
-
-    sendAlert(
-      `🎵 **New TikTok Posted!**\nhttps://tiktok.com/@${TIKTOK_USERNAME}`
-    );
-
+    sendAlert(`🎵 **New TikTok Posted!**\nhttps://tiktok.com/@${TIKTOK_USERNAME}`);
   } catch (e) {
     console.log("TikTok error:", e.message);
   }
 }
+setInterval(checkTikTok, 120000);
+
 // =======================
 // PERSONALITY SYSTEM
 // =======================
@@ -215,90 +191,43 @@ const getLevel = (xp) => Math.floor(0.1 * Math.sqrt(xp));
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 
 // =======================
-
-// =======================
-// XP LOGIC
-// =======================
-// Replace your addXP function with this:
-async function addXP(userId, guild) {
-    const gain = Math.floor(Math.random() * 6) + 5;
-    
-    // Find or Create user in MongoDB
-    let user = await User.findOne({ userId: userId });
-    if (!user) {
-        user = new User({ userId: userId, xp: gain, level: 0 });
-    } else {
-        user.xp += gain;
-        const newLevel = getLevel(user.xp);
-        
-        if (newLevel > user.level) {
-            user.level = newLevel;
-            const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
-            if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
-            // ... (keep your Chatterling logic here)
-        }
-    }
-    await user.save();
-}
-
-// =======================
-// EVENT HANDLERS
-// =======================
-// =======================
-// WELCOME MESSAGE
-// =======================
-// =======================
-// WELCOME & AUTO-ROLE
+// EVENT HANDLERS: WELCOME & LEAVE
 // =======================
 client.on("guildMemberAdd", async (member) => {
-    console.log(`New member joined: ${member.user.tag}`); // Debug log
+    console.log(`New member joined: ${member.user.tag}`);
     try {
-        // 1. Give Role
         const role = member.guild.roles.cache.find(r => r.name === "Minions");
         if (role) await member.roles.add(role);
 
-        // 2. Welcome Message Logic
-        console.log(`Attempting to send welcome to: ${WELCOME_CHANNEL_ID}`); // Debug log
-        
+        console.log(`Attempting to send welcome to: ${WELCOME_CHANNEL_ID}`);
         const channel = member.guild.channels.cache.get(WELCOME_CHANNEL_ID);
-        
         if (!channel) {
             console.log("❌ Error: Could not find welcome channel in cache!");
             return;
         }
 
-const welcomeEmbed = new EmbedBuilder()
-    .setColor(0xffc1e3) // A soft, dreamy fairy pink
-    .setTitle("✨ A new member has joined! 🧚‍♀️")
-    .setDescription(`hi hi <@${member.id}>! 🎀\nWelcome to the magic of **${member.guild.name}**! 🫧`)
-    .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
-    .setFooter({ text: `Magical Member #${member.guild.memberCount} 🪄` });
+        const welcomeEmbed = new EmbedBuilder()
+            .setColor(0xffc1e3)
+            .setTitle("✨ A new member has joined! 🧚‍♀️")
+            .setDescription(`hi hi <@${member.id}>! 🎀\nWelcome to the magic of **${member.guild.name}**! 🫧`)
+            .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
+            .setFooter({ text: `Magical Member #${member.guild.memberCount} 🪄` });
 
-await channel.send({ content: `Welcome ✨ <@${member.id}>!`, embeds: [welcomeEmbed] });
-console.log("✅ Fairy welcome message sent successfully!");
-
+        await channel.send({ content: `Welcome ✨ <@${member.id}>!`, embeds: [welcomeEmbed] });
+        console.log("✅ Fairy welcome message sent successfully!");
     } catch (e) {
         console.error("Welcome System Error:", e.message);
     }
 });
-// =======================
-// SYSTEM MONITORING (LEAVES)
-// =======================
-// =======================
-// SYSTEM MONITORING (LEAVES)
-// =======================
+
 client.on("guildMemberRemove", async (member) => {
     try {
-        // Look directly at the Env Variable
         const leaveChannelId = process.env.LEAVE_CHANNEL_ID;
-        
         if (!leaveChannelId) {
             return console.log("❌ Error: LEAVE_CHANNEL_ID is not defined in Render!");
         }
 
-        // Use fetch to be 100% sure we find it
         const channel = await member.guild.channels.fetch(leaveChannelId).catch(() => null);
-        
         if (!channel) {
             return console.log(`❌ Error: Could not find channel with ID ${leaveChannelId}`);
         }
@@ -316,34 +245,29 @@ client.on("guildMemberRemove", async (member) => {
 
         await channel.send({ embeds: [leaveEmbed] });
         console.log(`✅ Leave log sent for ${member.user.tag}`);
-
     } catch (e) {
         console.error("Leave Log Error:", e.message);
     }
 });
+
 client.once("ready", () => {
-  client.user.setPresence({
+    client.user.setPresence({
         status: "online",
         activities: [{ name: "💜 Always On ✨", type: ActivityType.Playing }]
-        
     });
-    // Heartbeat System
-// Heartbeat System (2-Hour Interval)
+
     let lastHeartbeat = 0;
     setInterval(() => {
         const now = Date.now();
-        // Skip if it hasn't been at least 1 hour and 55 minutes (6,900,000 ms)
         if (now - lastHeartbeat < 6900000) return; 
 
-        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID); // ✅ Changed to Alert Channel to keep General clean
+        const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
         if (channel) {
             channel.send("💜 I’m still online!").catch(() => {});
             lastHeartbeat = now;
         }
-    }, 1000 * 60 * 640); // 120 minutes = 2 hours
+    }, 1000 * 60 * 640);
 
-
-    // --- FEATURE: Random Messages every 12 Hours ---
     const randomGems = [
         "💜 Remember to drink some water today! ✨",
         "Hope everyone is having a lovely day so far! 🎀",
@@ -358,11 +282,8 @@ client.once("ready", () => {
             const quote = randomGems[Math.floor(Math.random() * randomGems.length)];
             channel.send(quote);
         }
-    }, 1000 * 60 * 60 * 12); // Exactly 12 hours
+    }, 1000 * 60 * 60 * 12);
 
-
-    // --- FEATURE: 9 AM Good Morning Message ---
-    // This runs every day at 09:00 (server time)
     cron.schedule('0 9 * * *', () => {
         const channel = client.channels.cache.get(GENERAL_CHANNEL_ID);
         if (channel) {
@@ -370,79 +291,79 @@ client.once("ready", () => {
         }
     }, {
         scheduled: true,
-        timezone: "America/New_York" // Set this to your specific timezone!
+        timezone: "America/New_York"
     });
 
-    console.log("⏰ Schedules initialized!");
+    console.log("⏰ Schedules and presence initialized!");
 });
-    client.on("messageCreate", async (message) => {
-    if (message.author.bot || !message.guild) return;
+
+// =======================
+// MAIN MESSAGE HANDLER
+// =======================
+client.on("messageCreate", async (message) => {
+    // 1. Ignore bot messages (except Disboard) and make sure it's in a server
+    if (!message.guild) return;
+    if (message.author.bot && message.author.id !== DISBOARD_BOT_ID) return;
 
     const content = message.content.toLowerCase();
     const args = message.content.split(" ");
 
-    // 1. Check if the message is from Disboard
-    if (message.author.id !== DISBOARD_BOT_ID) return;
+    // --- DISBOARD BUMP LOGIC (Only runs if sender is Disboard) ---
+    if (message.author.id === DISBOARD_BOT_ID) {
+        if (message.interaction && message.interaction.commandName === 'bump') {
+            if (message.embeds[0]?.description?.includes('Bump done')) {
+                console.log('Successful bump detected! Starting 2-hour timer...');
 
-    // 2. Check if the message was generated by a /bump slash command
-    // (We look at message.interaction which contains details of the user's slash command)
-    if (message.interaction && message.interaction.commandName === 'bump') {
-        
-        // Double-check Disboard's reply text to ensure the bump succeeded 
-        // (This prevents the timer starting if Disboard says "Please wait X minutes")
-        if (message.embeds[0]?.description?.includes('Bump done')) {
-            console.log('Successful bump detected! Starting 2-hour timer...');
+                if (activeBumpTimeout) clearTimeout(activeBumpTimeout);
 
-            // Clear any existing active timers to avoid double reminders
-            if (activeBumpTimeout) clearTimeout(activeBumpTimeout);
-
-            // Set the 2-hour timer
-            activeBumpTimeout = setTimeout(async () => {
-                try {
-                    const channel = await client.channels.fetch(ENHANCEMENTS_CHANNEL_ID);
-                    if (channel) {
-                        await channel.send('🔔 **The server is ready to be bumped!** Type `/bump` to help us grow! @Hera @Ban Hammer Abuser 🛠 ');
-                        console.log('Bump reminder sent to enhancements channel.');
+                activeBumpTimeout = setTimeout(async () => {
+                    try {
+                        const channel = await client.channels.fetch(ENHANCEMENTS_CHANNEL_ID);
+                        if (channel) {
+                            await channel.send('🔔 **The server is ready to be bumped!** Type `/bump` to help us grow! @Hera @Ban Hammer Abuser 🛠 ');
+                            console.log('Bump reminder sent to enhancements channel.');
+                        }
+                    } catch (error) {
+                        console.error('Error sending bump reminder:', error);
                     }
-                } catch (error) {
-                    console.error('Error sending bump reminder:', error);
-                }
-            }, TWO_HOURS);
+                }, TWO_HOURS);
+            }
         }
+        return; // Stop processing further commands for the Disboard bot
     }
-// 1. XP LOGIC
-let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
-if (!userData) {
-    userData = new User({ userId: message.author.id, guildId: message.guild.id });
-}
 
-// Add the XP
-userData.xp += 10; 
+    // --- REGULAR USERS XP LOGIC ---
+    let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
+    if (!userData) {
+        userData = new User({ userId: message.author.id, guildId: message.guild.id });
+    }
 
-// Calculate requirements: 100 * (level ^ 1.5) + (level * 50) + 100
-const nextLevelXP = Math.floor(100 * Math.pow(userData.level, 1.5) + (userData.level * 50) + 100);
+    // Add passive XP on message
+    userData.xp += 10; 
 
-// Check if they leveled up
-if (userData.xp >= nextLevelXP) {
-    userData.xp -= nextLevelXP; // Carry over excess XP
-    userData.level++;           // Increment the level
-    
-    // Try to send the announcement to your designated level-up channel
-    try {
-        const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
-        if (levelChannel) {
-            await levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}** (˶ᵔ ᵕ ᵔ˶)`);
-        } else {
+    // Level formula
+    const nextLevelXP = Math.floor(100 * Math.pow(userData.level, 1.5) + (userData.level * 50) + 100);
+
+    if (userData.xp >= nextLevelXP) {
+        userData.xp -= nextLevelXP;
+        userData.level++;
+        
+        try {
+            const levelChannel = await message.guild.channels.fetch(LEVEL_CHANNEL_ID);
+            if (levelChannel) {
+                await levelChannel.send(`✨ **Level Up!** <@${message.author.id}> reached level **${userData.level}** (˶ᵔ ᵕ ᵔ˶)`);
+            } else {
+                await message.reply(`🎉 **Level Up!** You've reached level **${userData.level}**!`);
+            }
+        } catch (error) {
+            console.error("Failed to find level channel:", error.message);
             await message.reply(`🎉 **Level Up!** You've reached level **${userData.level}**!`);
         }
-    } catch (error) {
-        console.error("Failed to find level channel:", error.message);
-        await message.reply(`🎉 **Level Up!** You've reached level **${userData.level}**!`);
     }
-}
+    await userData.save();
 
-// Save the updated profile to MongoDB
-await userData.save();
+    // --- COMMANDS ---
+
     // 2. HELP COMMAND
     if (content === "!help") {
         const embed = new EmbedBuilder()
@@ -580,10 +501,8 @@ await userData.save();
     
     // Passive responses
     if (Math.random() < 0.05) return message.reply(pick(responses[currentMood].default));
+});
 
-}); // <--- THIS IS THE CORRECT CLOSING FOR THE MESSAGE LISTENER
-
-// Keep your toggleRole function and client.login logic BELOW this point.
 // =======================
 // REACTION LOGIC
 // =======================
@@ -591,14 +510,12 @@ async function toggleRole(reaction, user, add = true) {
     if (user.bot || !reaction.message.guild) return;
     if (reaction.partial) await reaction.fetch().catch(() => {});
 
-    // MongoDB check instead of db.get
     const row = await RoleMessage.findOne({ messageId: reaction.message.id });
     if (!row) return;
 
     const roleName = reactionRolesMap[reaction.emoji.name];
     if (!roleName) return;
 
-      // Locate this line inside the toggleRole function near the bottom:
     const role = reaction.message.guild.roles.cache.find(r => r.name === roleName);
     const member = await reaction.message.guild.members.fetch(user.id).catch(() => {});
 
@@ -609,7 +526,6 @@ async function toggleRole(reaction, user, add = true) {
             await member.roles.remove(role).catch(e => console.error(`Remove role error: ${e}`));
         }
     }
-
 }
 
 client.on("messageReactionAdd", (r, u) => toggleRole(r, u, true));
@@ -620,6 +536,6 @@ client.on("messageReactionRemove", (r, u) => toggleRole(r, u, false));
 // =======================
 process.on("unhandledRejection", console.error);
 process.on("uncaughtException", console.error);
-console.log("START");
+console.log("STARTING HERA BOT...");
 
 client.login(process.env.DISCORD_TOKEN);
