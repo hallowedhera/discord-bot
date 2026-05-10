@@ -307,7 +307,7 @@ client.on("guildMemberAdd", async (member) => {
 const welcomeEmbed = new EmbedBuilder()
     .setColor(0xffc1e3) // A soft, dreamy fairy pink
     .setTitle("✨ A new member has joined! 🧚‍♀️")
-    .setDescription(`hi hi <@${member.id}>! 🎀\nWelcome to the magic of **${member.guild.name}**! 🫧`)
+    .setDescription(`<@${member.id}>! ♡\nWelcome to the magic of **${member.guild.name}**!`)
     .setThumbnail(member.user.displayAvatarURL({ dynamic: true }))
     .setFooter({ text: `Magical Member #${member.guild.memberCount} 🪄` });
 
