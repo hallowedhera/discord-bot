@@ -644,7 +644,7 @@ await userData.save();
     if (content.includes("hello") || content.includes("hi bot")) return message.reply(pick(responses[currentMood].hello));
     
     // Passive responses
-    if (Math.random() < 0.05) return message.reply(pick(responses[currentMood].default));
+    if (Math.random() < 0.01) return message.reply(pick(responses[currentMood].default));
 
 }); // <--- THIS IS THE CORRECT CLOSING FOR THE MESSAGE LISTENER
 
