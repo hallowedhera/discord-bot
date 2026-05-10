@@ -257,26 +257,16 @@ const pick = (arr) => arr[Math.floor(Math.random() * arr.length)];
 // XP LOGIC
 // =======================
 // Replace your addXP function with this:
-async function addXP(userId, guild) {
-    const gain = Math.floor(Math.random() * 6) + 5;
-    
-    // Find or Create user in MongoDB
-    let user = await User.findOne({ userId: userId });
-    if (!user) {
-        user = new User({ userId: userId, xp: gain, level: 0 });
-    } else {
-        user.xp += gain;
-        const newLevel = getLevel(user.xp);
-        
-        if (newLevel > user.level) {
-            user.level = newLevel;
-            const channel = client.channels.cache.get(LEVEL_CHANNEL_ID);
-            if (channel) channel.send(`🏆 <@${userId}> leveled up to **Level ${newLevel}** 💜`);
-            // ... (keep your Chatterling logic here)
-        }
-    }
-    await user.save();
+// 1. XP LOGIC
+if (message.author.bot) return; 
+
+let userData = await User.findOne({ userId: message.author.id, guildId: message.guild.id });
+if (!userData) {
+    userData = new User({ userId: message.author.id, guildId: message.guild.id, xp: 0, level: 1 });
 }
+
+// Add the XP safely
+userData.xp += 10;
 
 // =======================
 // EVENT HANDLERS
@@ -382,22 +372,6 @@ client.once("ready", () => {
 
     console.log("⏰ Schedules initialized!");
 }); // <-- Properly closes the ready event!
-// Start your loops OUTSIDE the ready block so they can't freeze the bot's login
-try {
-    // Only run checkTwitch if it's defined and active
-    if (typeof checkTwitch === "function") {
-        setInterval(checkTwitch, 90000);
-        console.log("📡 Twitch monitor started in background.");
-    }
-} catch (e) {
-    console.error("❌ Failed to start Twitch loop:", e.message);
-}
-    console.log("✅ Hera has successfully logged into Discord!");
-
-    // Start Twitch and TikTok monitoring ONLY after we are online
-    setInterval(checkTwitch, 90000);
-    setInterval(checkTikTok, 120000);
-    console.log("📡 Social media monitors started.");
 
     // Heartbeat System (2-Hour Interval)
     // Heartbeat System
